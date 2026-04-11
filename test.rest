@@ -1,0 +1,29 @@
+### 1001买入
+POST http://localhost:8080/api/v1/orders/place
+Content-Type: application/json
+
+{
+    "orderId": "10001",
+    "userId": 1001,
+    "action": "BID",
+    "reservePrice":50.0,
+    "orderType": "IOC",
+    "price": 50.0,
+    "size": 0.1,
+    "symbol": 1
+}
+
+### 1002卖出
+POST http://localhost:8080/api/v1/orders/place
+Content-Type: application/json
+
+{
+    "orderId": "10003",
+    "userId": 1002,
+    "action": "ASK",
+    "reservePrice":50.0,
+    "orderType": "IOC",
+    "price": 50.0,
+    "size": 0.1,
+    "symbol": 1
+}
