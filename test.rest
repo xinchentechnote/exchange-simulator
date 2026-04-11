@@ -3,14 +3,14 @@ POST http://localhost:8080/api/v1/orders/place
 Content-Type: application/json
 
 {
-    "orderId": "10001",
+    "orderId": "10005",
     "userId": 1001,
     "action": "BID",
     "reservePrice":50.0,
-    "orderType": "IOC",
+    "orderType": "GTC",
     "price": 50.0,
-    "size": 0.1,
-    "symbol": 1
+    "size": 1,
+    "symbol": 10086
 }
 
 ### 1002卖出
@@ -18,12 +18,12 @@ POST http://localhost:8080/api/v1/orders/place
 Content-Type: application/json
 
 {
-    "orderId": "10003",
+    "orderId": "10006",
     "userId": 1002,
     "action": "ASK",
     "reservePrice":50.0,
-    "orderType": "IOC",
+    "orderType": "GTC",
     "price": 50.0,
-    "size": 0.1,
-    "symbol": 1
+    "size": 1,
+    "symbol": 10086
 }

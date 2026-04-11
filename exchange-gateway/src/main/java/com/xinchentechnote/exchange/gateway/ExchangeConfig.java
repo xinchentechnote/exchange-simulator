@@ -1,6 +1,5 @@
 package com.xinchentechnote.exchange.gateway;
 
-import exchange.core2.collections.objpool.ObjectsPool;
 import exchange.core2.core.ExchangeApi;
 import exchange.core2.core.ExchangeCore;
 import exchange.core2.core.IEventsHandler;
@@ -10,16 +9,8 @@ import exchange.core2.core.common.SymbolType;
 import exchange.core2.core.common.api.ApiAddUser;
 import exchange.core2.core.common.api.binary.BatchAddSymbolsCommand;
 import exchange.core2.core.common.config.ExchangeConfiguration;
-import exchange.core2.core.common.config.InitialStateConfiguration;
-import exchange.core2.core.common.config.LoggingConfiguration;
-import exchange.core2.core.common.config.PerformanceConfiguration;
-import exchange.core2.core.processors.journaling.DummySerializationProcessor;
-import exchange.core2.core.processors.journaling.ISerializationProcessor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ForkJoinPool;
 
 @Configuration
 public class ExchangeConfig {
@@ -72,7 +63,7 @@ public class ExchangeConfig {
         api.submitCommandAsync(ApiAddUser.builder().uid(1002).build());
 
         CoreSymbolSpecification symbolSpecification = CoreSymbolSpecification.builder()
-                        .symbolId(1)
+                        .symbolId(10086)
                 .type(SymbolType.CURRENCY_EXCHANGE_PAIR)
                 .baseCurrency(100000000)
                 .quoteScaleK(100000000)
@@ -81,6 +72,8 @@ public class ExchangeConfig {
                                 .build();
         api.submitBinaryDataAsync(
                 new BatchAddSymbolsCommand(symbolSpecification));
+
+//        api.submitBinaryDataAsync(new BatchAddAccountsCommand());
         return api;
     }
 }
