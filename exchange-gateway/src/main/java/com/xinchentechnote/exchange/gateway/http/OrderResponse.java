@@ -1,15 +1,12 @@
-package com.xinchentechnote.exchange.gateway;
+package com.xinchentechnote.exchange.gateway.http;
 
-import com.xinchentechnote.exchange.gateway.OrderRequest;
+import com.xinchentechnote.exchange.gateway.SerialUID;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
-import exchange.core2.core.common.OrderAction;
-import exchange.core2.core.common.OrderType;
 import exchange.core2.core.common.api.ApiPlaceOrder;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
 
 @Data
 @NoArgsConstructor

@@ -1,5 +1,6 @@
-package com.xinchentechnote.exchange.gateway;
+package com.xinchentechnote.exchange.gateway.http;
 
+import com.xinchentechnote.exchange.gateway.SerialUID;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;

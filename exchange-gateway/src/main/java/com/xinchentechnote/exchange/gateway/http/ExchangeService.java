@@ -1,4 +1,4 @@
-package com.xinchentechnote.exchange.gateway;
+package com.xinchentechnote.exchange.gateway.http;
 
 import exchange.core2.core.common.api.ApiPlaceOrder;
 

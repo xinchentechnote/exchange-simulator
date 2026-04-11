@@ -1,16 +1,11 @@
-package com.xinchentechnote.exchange.gateway;
+package com.xinchentechnote.exchange.gateway.http;
 
-import exchange.core2.core.common.api.ApiPlaceOrder;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @RestController
