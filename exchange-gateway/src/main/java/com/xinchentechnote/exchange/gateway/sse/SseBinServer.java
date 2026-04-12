@@ -12,13 +12,12 @@ public class SseBinServer {
 
 
     public void start() {
-        SseBinServerHandler handler = new SseBinServerHandler();
         ServerBootstrap bootstrap = new ServerBootstrap();
         NioEventLoopGroup group = new NioEventLoopGroup(1);
         NioEventLoopGroup workGroup = new NioEventLoopGroup(3);
         bootstrap.group(group, workGroup)
                 .channel(io.netty.channel.socket.nio.NioServerSocketChannel.class)
-                .childHandler(new SseBinServerInitializer(handler));
+                .childHandler(new SseBinServerInitializer());
         bootstrap.bind(port).addListener(future -> {
             if (future.isSuccess()) {
                 System.out.println("SseBinServer started on port " + port);
