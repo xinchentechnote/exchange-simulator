@@ -1,0 +1,32 @@
+package com.xinchentechnote.exchange.gateway.sse;
+
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
+
+public class SseBinServerInitializer extends ChannelInitializer<SocketChannel> {
+
+    private final SseBinServerHandler handler;
+
+    public SseBinServerInitializer(SseBinServerHandler handler) {
+        this.handler = handler;
+    }
+
+    @Override
+    protected void initChannel(SocketChannel ch) {
+        ChannelPipeline pipeline = ch.pipeline();
+        //字段名 类型 说明
+        //MsgType uint32 消息类型
+        //MsgSeqNum uint64 消息序号
+        //MsgBodyLen uint32 消息体长度
+        pipeline.addLast(new LengthFieldBasedFrameDecoder(
+                1024 * 1024, // 最大帧长度
+                12,           // 长度字段偏移量（MsgType占4字节）
+                4,           // 长度字段长度（MsgSeqNum占8字节）
+                0,           // 长度调整（无调整）
+                0           // 初始字节剥离（MsgType + MsgSeqNum + MsgBodyLen占12字节）
+        ));
+        pipeline.addLast(handler);
+    }
+}

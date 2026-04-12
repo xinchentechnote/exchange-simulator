@@ -1,0 +1,3 @@
+StepId,Pbu,SetID,ReportIndex,BizID,ExecType,BizPbu,ClOrdID,SecurityID,Account,OwnerType,Side,Price,OrderQty,LeavesQty,CxlQty,OrdType,TimeInForce,OrdStatus,CreditTag,OrigClOrdID,ClearingFirm,BranchID,OrdRejReason,OrdCnfmID,OrigOrdCnfmID,TradeDate,TransactTime,UserInfo
+confirm_001,pbu001,1,1,010,0,pbu001,c10001,600519,a00001,1,1,175000,500,500,0,2,0,0,1,,1001,b001,0,oc00001,,20250106,101530,u000123
+confirm_002,pbu002,1,2,010,0,pbu002,c10002,600036,a00002,1,2,43500,800,800,0,2,0,0,1,,1002,b002,0,oc00002,,20250106,101605,u000456
