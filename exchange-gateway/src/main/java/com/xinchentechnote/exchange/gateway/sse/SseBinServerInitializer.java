@@ -24,8 +24,8 @@ public class SseBinServerInitializer extends ChannelInitializer<SocketChannel> {
                 1024 * 1024, // 最大帧长度
                 12,           // 长度字段偏移量（MsgType占4字节）
                 4,           // 长度字段长度（MsgSeqNum占8字节）
-                0,           // 长度调整（无调整）
-                0           // 初始字节剥离（MsgType + MsgSeqNum + MsgBodyLen占12字节）
+                4,           // 长度调整 + 4byte checksum
+                0           // 初始字节剥离
         ));
         pipeline.addLast(handler);
     }
