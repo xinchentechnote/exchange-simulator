@@ -2,9 +2,10 @@ package com.xinchentechnote.exchange.gateway.sse;
 
 import com.finproto.sse.bin.messages.SseBinary;
 import exchange.core2.core.common.api.ApiCommand;
+import io.netty.channel.Channel;
 import lombok.Data;
 
-import java.nio.channels.Channel;
+
 
 @Data
 public class CommandWrapper {

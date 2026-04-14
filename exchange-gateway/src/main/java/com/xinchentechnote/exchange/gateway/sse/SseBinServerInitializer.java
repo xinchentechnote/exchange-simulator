@@ -7,6 +7,11 @@ import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 
 public class SseBinServerInitializer extends ChannelInitializer<SocketChannel> {
 
+    private final SseBinServer sseBinServer;
+
+    public SseBinServerInitializer(SseBinServer sseBinServer) {
+        this.sseBinServer = sseBinServer;
+    }
 
     @Override
     protected void initChannel(SocketChannel ch) {
@@ -22,6 +27,6 @@ public class SseBinServerInitializer extends ChannelInitializer<SocketChannel> {
                 4,           // 长度调整 + 4byte checksum
                 0           // 初始字节剥离
         ));
-        pipeline.addLast(new SseBinServerHandler());
+        pipeline.addLast(new SseBinServerHandler(this.sseBinServer));
     }
 }

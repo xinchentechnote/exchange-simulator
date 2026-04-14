@@ -1,7 +1,6 @@
-package com.xinchentechnote.exchange.gateway.sse;
+package com.xinchentechnote.exchange.gateway.sse.cmd;
 
 import com.finproto.codec.BinaryCodec;
-import exchange.core2.core.common.api.ApiCommand;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -15,16 +14,16 @@ public class ApiCommandConvertorContext {
 
     private ApiCommandConvertorContext() {
         // Register convertors here
-        registerConvertor(new NewOrderSingleToApiPlaceOrderConvertor());
+        registerConvertor(new SseApiCommandConverter());
     }
 
-    private final Map<Class<?>, ApiCommandConvertor<?>> convertorMap = new HashMap<>();
+    private final Map<Class<?>, IApiCommandConverter<?,?>> convertorMap = new HashMap<>();
 
-    public void registerConvertor(ApiCommandConvertor<?> convertor) {
+    public void registerConvertor(IApiCommandConverter<?,?> convertor) {
         convertorMap.put(convertor.support(), convertor);
     }
 
-    public ApiCommandConvertor get(BinaryCodec msg){
-       return convertorMap.get(msg.getClass());
+    public IApiCommandConverter get(BinaryCodec msg) {
+        return convertorMap.get(msg.getClass());
     }
 }
