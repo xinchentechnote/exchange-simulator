@@ -11,6 +11,7 @@ import exchange.core2.core.common.api.ApiAdjustUserBalance;
 import exchange.core2.core.common.api.binary.BatchAddSymbolsCommand;
 import exchange.core2.core.common.config.ExchangeConfiguration;
 import lombok.Data;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,35 +19,27 @@ import org.springframework.context.annotation.Configuration;
 @Data
 @Configuration
 @ConfigurationProperties(prefix = "sse.bin.server")
-public class SseBinServerConfig {
+public class SseBinServerConfig implements InitializingBean {
 
     private int port = 9010;
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        System.out.println(this);
+    }
 
     @Bean
     public SseBinServer sseBinServer() {
         SseBinServer sseBinServer = new SseBinServer(this.port);
         ExchangeApi exchangeApi = exchangeApi(sseBinServer);
         sseBinServer.setApi(exchangeApi);
+        initBaseInfo(exchangeApi);
         sseBinServer.start();
         return sseBinServer;
     }
 
-    public ExchangeApi exchangeApi(SseBinServer sseBinServer) {
-        // simple async events handler
-        SimpleEventsProcessor eventsProcessor = new SimpleEventsProcessor(sseBinServer);
-
-        // default exchange configuration
-        ExchangeConfiguration conf = ExchangeConfiguration.defaultBuilder().build();
-
-        // build exchange core
-        ExchangeCore exchangeCore = ExchangeCore.builder()
-                .resultsConsumer(eventsProcessor)
-                .exchangeConfiguration(conf)
-                .build();
-
-        // start up disruptor threads
-        exchangeCore.startup();
-
+    private void initBaseInfo(ExchangeApi api) {
+        //load symbol and account info
         // currency code constants
         final int currencyCodeXbt = 11;
         final int currencyCodeLtc = 15;
@@ -54,8 +47,6 @@ public class SseBinServerConfig {
         // symbol constants
         final int symbolXbtLtc = 10086;
 
-        // 获取API
-        ExchangeApi api = exchangeCore.getApi();
         api.submitCommandAsync(ApiAddUser.builder().uid(1001).build());
         api.submitCommandAsync(ApiAddUser.builder().uid(1002).build());
 
@@ -78,6 +69,25 @@ public class SseBinServerConfig {
         api.submitCommandAsync(ApiAdjustUserBalance.builder().uid(1002)
                 .currency(currencyCodeXbt)
                 .amount(20000000).transactionId(2).build());
-        return api;
+
+    }
+
+    public ExchangeApi exchangeApi(SseBinServer sseBinServer) {
+        // simple async events handler
+        SimpleEventsProcessor eventsProcessor = new SimpleEventsProcessor(sseBinServer);
+
+        // default exchange configuration
+        ExchangeConfiguration conf = ExchangeConfiguration.defaultBuilder().build();
+
+        // build exchange core
+        ExchangeCore exchangeCore = ExchangeCore.builder()
+                .resultsConsumer(eventsProcessor)
+                .exchangeConfiguration(conf)
+                .build();
+
+        // start up disruptor threads
+        exchangeCore.startup();
+        // 获取API
+        return exchangeCore.getApi();
     }
 }
