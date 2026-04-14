@@ -103,21 +103,25 @@ public class SseBinServer implements IEventsHandler {
 
     @Override
     public void reduceEvent(ReduceEvent reduceEvent) {
+        //暂不处理
         System.out.println("Reduce event: " + reduceEvent);
     }
 
     @Override
     public void rejectEvent(RejectEvent rejectEvent) {
+        //拒绝，委托拒绝和撤单拒绝
         System.out.println("Reject event: " + rejectEvent);
     }
 
     @Override
     public void commandResult(ApiCommandResult commandResult) {
+        //委托确认
         System.out.println("Command result: " + commandResult);
     }
 
     @Override
     public void orderBook(OrderBook orderBook) {
+        //行情发布
         System.out.println("OrderBook event: " + orderBook);
     }
 }
