@@ -1,5 +1,7 @@
 package com.xinchentechnote.exchange.gateway.sse;
 
+import com.xinchentechnote.exchange.gateway.sse.loaddata.AccountInfoLoadService;
+import com.xinchentechnote.exchange.gateway.sse.loaddata.SymbolInfoLoadService;
 import exchange.core2.core.ExchangeApi;
 import exchange.core2.core.ExchangeCore;
 import exchange.core2.core.IEventsHandler;
@@ -12,9 +14,12 @@ import exchange.core2.core.common.api.binary.BatchAddSymbolsCommand;
 import exchange.core2.core.common.config.ExchangeConfiguration;
 import lombok.Data;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.List;
 
 @Data
 @Configuration
@@ -22,6 +27,13 @@ import org.springframework.context.annotation.Configuration;
 public class SseBinServerConfig implements InitializingBean {
 
     private int port = 9010;
+
+    @Autowired
+    private SseBinMatcherConfig sseBinMatcherConfig;
+    @Autowired
+    private SymbolInfoLoadService symbolInfoLoadService;
+    @Autowired
+    private AccountInfoLoadService accountInfoLoadService;
 
     @Override
     public void afterPropertiesSet() throws Exception {
@@ -40,35 +52,16 @@ public class SseBinServerConfig implements InitializingBean {
 
     private void initBaseInfo(ExchangeApi api) {
         //load symbol and account info
-        // currency code constants
-        final int currencyCodeXbt = 11;
-        final int currencyCodeLtc = 15;
+        List<ApiAdjustUserBalance> userBalances = accountInfoLoadService.loadData(sseBinMatcherConfig.getAccountInfoPath());
+        List<CoreSymbolSpecification> coreSymbolSpecifications = symbolInfoLoadService.loadData(sseBinMatcherConfig.getSymbolInfoPath());
 
-        // symbol constants
-        final int symbolXbtLtc = 10086;
+        userBalances.stream().map(u -> u.uid).distinct().forEach(uid -> {
+            api.submitCommandAsync(ApiAddUser.builder().uid(uid).build());
+        });
 
-        api.submitCommandAsync(ApiAddUser.builder().uid(1001).build());
-        api.submitCommandAsync(ApiAddUser.builder().uid(1002).build());
+        api.submitBinaryDataAsync(new BatchAddSymbolsCommand(coreSymbolSpecifications));
 
-        CoreSymbolSpecification symbolSpecification = CoreSymbolSpecification.builder()
-                .symbolId(symbolXbtLtc)
-                .type(SymbolType.CURRENCY_EXCHANGE_PAIR)
-                .baseCurrency(currencyCodeXbt)
-                .quoteCurrency(currencyCodeLtc)
-                .baseScaleK(1000000)
-                .quoteScaleK(10000)
-                .takerFee(1000)
-                .makerFee(100)
-                .build();
-        api.submitBinaryDataAsync(
-                new BatchAddSymbolsCommand(symbolSpecification));
-
-        api.submitCommandAsync(ApiAdjustUserBalance.builder().uid(1001)
-                .currency(currencyCodeLtc)
-                .amount(20000000).transactionId(1).build());
-        api.submitCommandAsync(ApiAdjustUserBalance.builder().uid(1002)
-                .currency(currencyCodeXbt)
-                .amount(20000000).transactionId(2).build());
+        userBalances.forEach(api::submitCommandAsync);
 
     }
 
@@ -80,10 +73,7 @@ public class SseBinServerConfig implements InitializingBean {
         ExchangeConfiguration conf = ExchangeConfiguration.defaultBuilder().build();
 
         // build exchange core
-        ExchangeCore exchangeCore = ExchangeCore.builder()
-                .resultsConsumer(eventsProcessor)
-                .exchangeConfiguration(conf)
-                .build();
+        ExchangeCore exchangeCore = ExchangeCore.builder().resultsConsumer(eventsProcessor).exchangeConfiguration(conf).build();
 
         // start up disruptor threads
         exchangeCore.startup();

@@ -74,6 +74,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>33.5.0-jre</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.xinchentechnote.finproto</groupId>
             <artifactId>sse-bin</artifactId>
             <version>1.0.0</version>
