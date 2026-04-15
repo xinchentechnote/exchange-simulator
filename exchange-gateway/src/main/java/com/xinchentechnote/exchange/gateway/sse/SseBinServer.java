@@ -54,7 +54,6 @@ public class SseBinServer implements IEventsHandler {
 
     public void onMessage(SseBinary msg, Channel channel) {
         // 处理接收到的消息
-        System.out.println("Received msg: " + msg);
         BinaryCodec body = msg.getBody();
         IApiCommandConverter converter = ApiCommandConvertorContext.getInstance().get(body);
         ApiCommand apiCommand = converter.convertNewOrder(body);

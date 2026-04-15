@@ -19,8 +19,9 @@ public class SseApiCommandConverter implements IApiCommandConverter<NewOrderSing
     @Override
     public ApiPlaceOrder convertNewOrder(NewOrderSingle order) {
         ApiPlaceOrder.ApiPlaceOrderBuilder builder = ApiPlaceOrder.builder();
+        long price = order.getPrice();
         builder.orderId(GlobalUniqueId.getAndIncrement()).symbol(Integer.parseInt(order.getSecurityId())).uid(Long.parseLong(order.getAccount())).action("1".equals(order.getSide()) ? OrderAction.BID : OrderAction.ASK).orderType(OrderType.GTC) // 这里默认使用GTC，可以根据需要调整
-                .size(order.getOrderQty()).price(order.getPrice());
+                .reservePrice(price).size(order.getOrderQty()).price(price);
         return builder.build();
     }
 

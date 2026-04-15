@@ -1,5 +1,6 @@
 package com.xinchentechnote.exchange.gateway.sse;
 
+import com.xinchentechnote.exchange.gateway.GlobalUniqueId;
 import com.xinchentechnote.exchange.gateway.sse.loaddata.AccountInfoLoadService;
 import com.xinchentechnote.exchange.gateway.sse.loaddata.SymbolInfoLoadService;
 import exchange.core2.core.ExchangeApi;
@@ -61,7 +62,10 @@ public class SseBinServerConfig implements InitializingBean {
 
         api.submitBinaryDataAsync(new BatchAddSymbolsCommand(coreSymbolSpecifications));
 
-        userBalances.forEach(api::submitCommandAsync);
+        userBalances.forEach(ub->{
+            ApiAdjustUserBalance build = ApiAdjustUserBalance.builder().uid(ub.uid).currency(ub.currency).amount(ub.amount).transactionId(GlobalUniqueId.getAndIncrement()).build();
+            api.submitCommandAsync(build);
+        });
 
     }
 
