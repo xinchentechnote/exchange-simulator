@@ -1,3 +1,7 @@
 case_id,case_title,step_id,sleep_ms,step_desc,action_type,verify_required,test_tool,msg_type,test_data
-sse_001,order,new_order_001,1,oms send new order,Send,N,sse_bin_oms_1,58,sse_58
-sse_001,order,new_order_002,1,oms send new order,Send,N,sse_bin_oms_1,58,sse_58
+sse_001,order,new_order_001,1000,oms send new order,Send,N,sse_bin_oms_1,58,sse_58
+sse_001,order,new_order_002,1000,oms send new order,Send,N,sse_bin_oms_1,58,sse_58
+sse_001,confirm,confirm_001,1000,oms rev confirm,Receive,Y,sse_bin_oms_1,32,sse_32
+sse_001,confirm,confirm_002,1000,oms rev confirm,Receive,Y,sse_bin_oms_1,32,sse_32
+sse_001,report,report_001,1000,oms rev report,Receive,Y,sse_bin_oms_1,103,sse_103
+sse_001,report,report_002,1000,oms rev report,Receive,Y,sse_bin_oms_1,103,sse103

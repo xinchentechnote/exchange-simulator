@@ -17,6 +17,14 @@ public class SseTradeEventReportConvertor implements IReportConvertor<IEventsHan
         if (body instanceof NewOrderSingle) {
             NewOrderSingle orderSingle = (NewOrderSingle) body;
             report.setAccount(orderSingle.getAccount());
+            report.setSecurityId(orderSingle.getSecurityId());
+            report.setBizId(orderSingle.getBizId());
+            report.setExecType("F");
+            report.setPbu(orderSingle.getBizPbu());
+            report.setBizPbu(orderSingle.getBizPbu());
+            report.setClOrdId(orderSingle.getClOrdId());
+            report.setBranchId(orderSingle.getBranchId());
+            report.setSide(orderSingle.getSide());
         }
         return report;
     }

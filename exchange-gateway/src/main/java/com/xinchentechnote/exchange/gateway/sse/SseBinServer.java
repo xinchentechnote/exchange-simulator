@@ -1,6 +1,8 @@
 package com.xinchentechnote.exchange.gateway.sse;
 
 import com.finproto.codec.BinaryCodec;
+import com.finproto.sse.bin.messages.Confirm;
+import com.finproto.sse.bin.messages.NewOrderSingle;
 import com.finproto.sse.bin.messages.Report;
 import com.finproto.sse.bin.messages.SseBinary;
 import com.xinchentechnote.exchange.gateway.sse.cmd.ApiCommandConvertorContext;
@@ -16,6 +18,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
 import lombok.Data;
 import org.springframework.util.CollectionUtils;
 
@@ -40,7 +43,7 @@ public class SseBinServer implements IEventsHandler {
         NioEventLoopGroup group = new NioEventLoopGroup(1);
         NioEventLoopGroup workGroup = new NioEventLoopGroup(3);
         bootstrap.group(group, workGroup)
-                .channel(io.netty.channel.socket.nio.NioServerSocketChannel.class)
+                .channel(NioServerSocketChannel.class)
                 .childHandler(new SseBinServerInitializer(this));
         bootstrap.bind(port).addListener(future -> {
             if (future.isSuccess()) {
@@ -96,8 +99,8 @@ public class SseBinServer implements IEventsHandler {
         sseBinary.setBody(report);
 
         ByteBuf buf = Unpooled.buffer();
-        report.encode(buf);
-        channel.write(buf);
+        sseBinary.encode(buf);
+        channel.writeAndFlush(buf);
     }
 
     @Override
@@ -116,6 +119,45 @@ public class SseBinServer implements IEventsHandler {
     public void commandResult(ApiCommandResult commandResult) {
         //委托确认
         System.out.println("Command result: " + commandResult);
+        ApiCommand command = commandResult.getCommand();
+        if (command instanceof ApiPlaceOrder) {
+            ApiPlaceOrder apiPlaceOrder = (ApiPlaceOrder) command;
+            long orderId = apiPlaceOrder.orderId;
+            CommandWrapper commandWrapper = cache.get(orderId);
+            if (commandWrapper != null) {
+                switch (commandResult.getResultCode()) {
+                    case SUCCESS:
+                        SseBinary originMsg = commandWrapper.getOriginMsg();
+                        NewOrderSingle body = (NewOrderSingle) originMsg.getBody();
+                        Confirm confirm = new Confirm();
+                        confirm.setAccount(body.getAccount());
+                        confirm.setSecurityId(body.getSecurityId());
+                        confirm.setClOrdId(body.getClOrdId());
+                        confirm.setBizId(body.getBizId());
+                        confirm.setBranchId(body.getBranchId());
+                        confirm.setBizPbu(body.getBizPbu());
+                        confirm.setPbu(body.getBizPbu());
+                        confirm.setSide(body.getSide());
+                        confirm.setOrderQty(body.getOrderQty());
+                        confirm.setPrice(body.getPrice());
+                        confirm.setExecType("0");
+                        confirm.setUserInfo(body.getUserInfo());
+                        sendConfirm(commandWrapper.getChannel(), confirm);
+                        break;
+                    default:
+                        // 其他结果码暂不处理
+                }
+            }
+        }
+    }
+
+    private void sendConfirm(Channel channel, Confirm confirm) {
+        SseBinary sseBinary = new SseBinary();
+        sseBinary.setMsgType(32);
+        sseBinary.setBody(confirm);
+        ByteBuf buf = Unpooled.buffer();
+        sseBinary.encode(buf);
+        channel.writeAndFlush(buf);
     }
 
     @Override
