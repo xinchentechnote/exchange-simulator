@@ -128,20 +128,29 @@ public class SseBinServer implements IEventsHandler {
                 switch (commandResult.getResultCode()) {
                     case SUCCESS:
                         SseBinary originMsg = commandWrapper.getOriginMsg();
-                        NewOrderSingle body = (NewOrderSingle) originMsg.getBody();
+                        NewOrderSingle orderSingle = (NewOrderSingle) originMsg.getBody();
                         Confirm confirm = new Confirm();
-                        confirm.setAccount(body.getAccount());
-                        confirm.setSecurityId(body.getSecurityId());
-                        confirm.setClOrdId(body.getClOrdId());
-                        confirm.setBizId(body.getBizId());
-                        confirm.setBranchId(body.getBranchId());
-                        confirm.setBizPbu(body.getBizPbu());
-                        confirm.setPbu(body.getBizPbu());
-                        confirm.setSide(body.getSide());
-                        confirm.setOrderQty(body.getOrderQty());
-                        confirm.setPrice(body.getPrice());
+                        confirm.setAccount(orderSingle.getAccount());
+                        confirm.setSecurityId(orderSingle.getSecurityId());
+                        confirm.setClOrdId(orderSingle.getClOrdId());
+                        confirm.setBizId(orderSingle.getBizId());
+                        confirm.setBranchId(orderSingle.getBranchId());
+                        confirm.setBizPbu(orderSingle.getBizPbu());
+                        confirm.setPbu(orderSingle.getBizPbu());
+                        confirm.setSide(orderSingle.getSide());
+                        confirm.setOrderQty(orderSingle.getOrderQty());
+                        confirm.setPrice(orderSingle.getPrice());
                         confirm.setExecType("0");
-                        confirm.setUserInfo(body.getUserInfo());
+                        confirm.setUserInfo(orderSingle.getUserInfo());
+                        confirm.setTransactTime(orderSingle.getTransactTime());
+                        confirm.setTradeDate((int) (orderSingle.getTransactTime()/1000_000));
+                        confirm.setClearingFirm(orderSingle.getClearingFirm());
+                        confirm.setCreditTag(orderSingle.getCreditTag());
+                        confirm.setOrdStatus("0");
+                        confirm.setTimeInForce(orderSingle.getTimeInForce());
+                        confirm.setOrdType(orderSingle.getOrdType());
+                        confirm.setLeavesQty(orderSingle.getOrderQty());
+                        confirm.setOwnerType(orderSingle.getOwnerType());
                         sendConfirm(commandWrapper.getChannel(), confirm);
                         break;
                     default:

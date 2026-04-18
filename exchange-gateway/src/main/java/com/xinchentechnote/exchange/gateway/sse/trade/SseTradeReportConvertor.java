@@ -25,6 +25,14 @@ public class SseTradeReportConvertor implements IReportConvertor<IEventsHandler.
             report.setClOrdId(orderSingle.getClOrdId());
             report.setBranchId(orderSingle.getBranchId());
             report.setSide(orderSingle.getSide());
+            report.setUserInfo(orderSingle.getUserInfo());
+            report.setTransactTime(orderSingle.getTransactTime());
+            report.setTradeDate((int) (orderSingle.getTransactTime()/1000_000));
+            report.setOrderQty(orderSingle.getOrderQty());
+            report.setOrdStatus("0");
+            report.setLastPx(trade.price);
+            report.setLastQty(trade.volume);
+            report.setCreditTag(orderSingle.getCreditTag());
         }
         return report;
     }
