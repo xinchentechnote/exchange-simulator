@@ -1,10 +1,16 @@
 package com.xinchentechnote.exchange.gateway.sse;
 
+import com.finproto.sse.bin.messages.Logon;
 import com.finproto.sse.bin.messages.SseBinary;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.handler.timeout.IdleStateHandler;
 import lombok.extern.log4j.Log4j2;
+
+import java.util.concurrent.TimeUnit;
 
 @Log4j2
 public class SseBinServerHandler extends SimpleChannelInboundHandler<ByteBuf> {
@@ -48,15 +54,28 @@ public class SseBinServerHandler extends SimpleChannelInboundHandler<ByteBuf> {
                 //登陆逻辑
                 msg.retain().resetReaderIndex();
                 ctx.channel().writeAndFlush(msg);
+                ChannelPipeline pipeline = ctx.channel().pipeline();
+                short heartBtInt = ((Logon) sseBinary.getBody()).getHeartBtInt();
+                pipeline.remove("idle");
+                pipeline.addAfter("frame","idle",new IdleStateHandler(heartBtInt,0,0));
                 break;
             case 41:
                 //登出逻辑
                 msg.retain().resetReaderIndex();
                 ctx.channel().writeAndFlush(msg);
-                ctx.executor().schedule(() -> ctx.close(), 3, java.util.concurrent.TimeUnit.SECONDS);
+                ctx.executor().schedule(() -> ctx.close(), 3, TimeUnit.SECONDS);
                 break;
             default:
                 sseBinServer.onMessage(sseBinary, ctx.channel());
         }
+    }
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        if (evt instanceof IdleStateEvent) {
+            //TODO 超时检测
+            log.warn("Idle timeout, closing connection: {}" , ctx.channel().remoteAddress());
+        }
+        super.userEventTriggered(ctx, evt);
     }
 }
