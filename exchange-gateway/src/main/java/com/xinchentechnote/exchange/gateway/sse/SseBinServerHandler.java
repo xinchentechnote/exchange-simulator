@@ -2,7 +2,6 @@ package com.xinchentechnote.exchange.gateway.sse;
 
 import com.finproto.sse.bin.messages.SseBinary;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import lombok.extern.log4j.Log4j2;
@@ -35,23 +34,24 @@ public class SseBinServerHandler extends SimpleChannelInboundHandler<ByteBuf> {
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) throws Exception {
+        ByteBuf decodeBuf = msg.duplicate();
         SseBinary sseBinary = new SseBinary();
-        sseBinary.decode(msg);
+        sseBinary.decode(decodeBuf);
         log.info("Received msg: {}" , sseBinary);
         switch (sseBinary.getMsgType()) {
             case 33:
                 //心跳逻辑
-                msg.retain();
+                msg.retain().resetReaderIndex();
                 ctx.channel().writeAndFlush(msg);
                 break;
             case 40:
                 //登陆逻辑
-                msg.retain();
+                msg.retain().resetReaderIndex();
                 ctx.channel().writeAndFlush(msg);
                 break;
             case 41:
                 //登出逻辑
-                msg.retain();
+                msg.retain().resetReaderIndex();
                 ctx.channel().writeAndFlush(msg);
                 ctx.executor().schedule(() -> ctx.close(), 3, java.util.concurrent.TimeUnit.SECONDS);
                 break;
