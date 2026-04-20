@@ -20,6 +20,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import lombok.Data;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.util.CollectionUtils;
 
 import java.util.List;
@@ -27,6 +28,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Data
+@Log4j2
 public class SseBinServer implements IEventsHandler {
 
     private ExchangeApi api;
@@ -47,10 +49,9 @@ public class SseBinServer implements IEventsHandler {
                 .childHandler(new SseBinServerInitializer(this));
         bootstrap.bind(port).addListener(future -> {
             if (future.isSuccess()) {
-                System.out.println("SseBinServer started on port " + port);
+                log.info("SseBinServer started on port :{}" , port);
             } else {
-                System.err.println("Failed to start SseBinServer on port " + port);
-                future.cause().printStackTrace();
+                log.error("Failed to start SseBinServer on port :{},{}" , port,future.cause());
             }
         });
     }
@@ -60,7 +61,7 @@ public class SseBinServer implements IEventsHandler {
         BinaryCodec body = msg.getBody();
         IApiCommandConverter converter = ApiCommandConvertorContext.getInstance().get(body);
         if (converter == null) {
-            System.err.println("No converter found for msg type: " + msg.getMsgType());
+            log.error("No converter found for msg type: {}" , msg.getMsgType());
             return;
         }
         ApiCommand apiCommand = converter.convertNewOrder(body);
@@ -77,7 +78,7 @@ public class SseBinServer implements IEventsHandler {
 
     @Override
     public void tradeEvent(TradeEvent tradeEvent) {
-        System.out.println("Trade event: " + tradeEvent);
+        log.info("Trade event: {}" , tradeEvent);
         long takerOrderId = tradeEvent.getTakerOrderId();
         CommandWrapper commandWrapper = cache.get(takerOrderId);
         SseTradeEventReportConvertor reportConvertor = new SseTradeEventReportConvertor();
@@ -110,19 +111,19 @@ public class SseBinServer implements IEventsHandler {
     @Override
     public void reduceEvent(ReduceEvent reduceEvent) {
         //暂不处理
-        System.out.println("Reduce event: " + reduceEvent);
+        log.info("Reduce event: {}" , reduceEvent);
     }
 
     @Override
     public void rejectEvent(RejectEvent rejectEvent) {
         //拒绝，委托拒绝和撤单拒绝
-        System.out.println("Reject event: " + rejectEvent);
+        log.info("Reject event: {}" , rejectEvent);
     }
 
     @Override
     public void commandResult(ApiCommandResult commandResult) {
         //委托确认
-        System.out.println("Command result: " + commandResult);
+        log.info("Command result: {}" , commandResult);
         ApiCommand command = commandResult.getCommand();
         if (command instanceof ApiPlaceOrder) {
             ApiPlaceOrder apiPlaceOrder = (ApiPlaceOrder) command;
@@ -176,6 +177,6 @@ public class SseBinServer implements IEventsHandler {
     @Override
     public void orderBook(OrderBook orderBook) {
         //行情发布
-        System.out.println("OrderBook event: " + orderBook);
+        log.info("OrderBook event: {}" , orderBook);
     }
 }
