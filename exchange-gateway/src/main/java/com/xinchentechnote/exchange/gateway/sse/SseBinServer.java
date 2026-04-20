@@ -59,6 +59,10 @@ public class SseBinServer implements IEventsHandler {
         // 处理接收到的消息
         BinaryCodec body = msg.getBody();
         IApiCommandConverter converter = ApiCommandConvertorContext.getInstance().get(body);
+        if (converter == null) {
+            System.err.println("No converter found for msg type: " + msg.getMsgType());
+            return;
+        }
         ApiCommand apiCommand = converter.convertNewOrder(body);
         if (apiCommand instanceof ApiPlaceOrder){
             CommandWrapper commandWrapper = new CommandWrapper();
