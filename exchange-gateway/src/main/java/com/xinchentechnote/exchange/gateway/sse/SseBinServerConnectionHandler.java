@@ -13,13 +13,7 @@ import lombok.extern.log4j.Log4j2;
 import java.util.concurrent.TimeUnit;
 
 @Log4j2
-public class SseBinServerHandler extends SimpleChannelInboundHandler<ByteBuf> {
-
-    private final SseBinServer sseBinServer;
-
-    public SseBinServerHandler(SseBinServer sseBinServer) {
-        this.sseBinServer = sseBinServer;
-    }
+public class SseBinServerConnectionHandler extends SimpleChannelInboundHandler<ByteBuf> {
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
@@ -35,7 +29,7 @@ public class SseBinServerHandler extends SimpleChannelInboundHandler<ByteBuf> {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        log.error("Exception in channel {}, {} " , ctx.channel().remoteAddress(), cause);
+        log.error("Exception in channel {}, {} ", ctx.channel().remoteAddress(), cause);
     }
 
     @Override
@@ -43,30 +37,51 @@ public class SseBinServerHandler extends SimpleChannelInboundHandler<ByteBuf> {
         ByteBuf decodeBuf = msg.duplicate();
         SseBinary sseBinary = new SseBinary();
         sseBinary.decode(decodeBuf);
-        log.info("Received msg: {}" , sseBinary);
-        switch (sseBinary.getMsgType()) {
-            case 33:
+        log.debug("Received msg: {}", sseBinary);
+        SseBinary.BodyMessageFactory.MessageType messageType = SseBinary.BodyMessageFactory.MessageType.fromValue(sseBinary.getMsgType());
+        switch (messageType) {
+            case HEARTBEAT:
                 //心跳逻辑
+                if (!ctx.channel().attr(Constant.LOGON).get()) {
+                    log.debug("Received non-logon message before login, closing connection: {}", ctx.channel().remoteAddress());
+                    ctx.close();
+                    return;
+                }
                 msg.retain().resetReaderIndex();
                 ctx.channel().writeAndFlush(msg);
+                //传递下游，心跳检测
+                ctx.fireChannelRead(sseBinary);
                 break;
-            case 40:
+            case LOGON:
                 //登陆逻辑
                 msg.retain().resetReaderIndex();
                 ctx.channel().writeAndFlush(msg);
                 ChannelPipeline pipeline = ctx.channel().pipeline();
-                short heartBtInt = ((Logon) sseBinary.getBody()).getHeartBtInt();
-                pipeline.remove("idle");
-                pipeline.addAfter("frame","idle",new IdleStateHandler(heartBtInt,0,0));
+                Logon logon = (Logon) sseBinary.getBody();
+                //登录逻辑
+                ctx.channel().attr(Constant.LOGON).set(true);
+                short heartBtInt = logon.getHeartBtInt();
+                pipeline.remove(Constant.IDLE);
+                pipeline.addAfter(Constant.CONNECTION, Constant.IDLE, new IdleStateHandler(heartBtInt, 0, 0));
                 break;
-            case 41:
+            case LOGOUT:
                 //登出逻辑
+                if (!ctx.channel().attr(Constant.LOGON).get()) {
+                    log.debug("Received non-logon message before login, closing connection: {}", ctx.channel().remoteAddress());
+                    ctx.close();
+                    return;
+                }
                 msg.retain().resetReaderIndex();
                 ctx.channel().writeAndFlush(msg);
                 ctx.executor().schedule(() -> ctx.close(), 3, TimeUnit.SECONDS);
                 break;
             default:
-                sseBinServer.onMessage(sseBinary, ctx.channel());
+                if (!ctx.channel().attr(Constant.LOGON).get()) {
+                    log.debug("Received non-logon message before login, closing connection: {}", ctx.channel().remoteAddress());
+                    ctx.close();
+                    return;
+                }
+                ctx.fireChannelRead(sseBinary);
         }
     }
 
@@ -74,7 +89,7 @@ public class SseBinServerHandler extends SimpleChannelInboundHandler<ByteBuf> {
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
         if (evt instanceof IdleStateEvent) {
             //TODO 超时检测
-            log.warn("Idle timeout, closing connection: {}" , ctx.channel().remoteAddress());
+            log.warn("Idle timeout, closing connection: {}", ctx.channel().remoteAddress());
         }
         super.userEventTriggered(ctx, evt);
     }
