@@ -48,7 +48,7 @@ public class SseBinServerMessageHandler extends SimpleChannelInboundHandler<SseB
             heartbeatTimeoutCounter++;
             if (heartbeatTimeoutCounter >= 3) {
                 log.warn("Idle timeout, closing connection: {}", ctx.channel().remoteAddress());
-                ctx.close();
+//                ctx.close();
             }
         }
         super.userEventTriggered(ctx, evt);

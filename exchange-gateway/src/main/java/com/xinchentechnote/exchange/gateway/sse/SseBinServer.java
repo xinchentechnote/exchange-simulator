@@ -26,6 +26,7 @@ import org.springframework.util.CollectionUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Data
 @Log4j2
@@ -33,6 +34,8 @@ public class SseBinServer implements IEventsHandler {
 
     private ExchangeApi api;
     private int port;
+
+    private AtomicLong msgSeqNum = new AtomicLong(1);
 
     private Map<Long, CommandWrapper> cache = new ConcurrentHashMap<>();
 
@@ -102,7 +105,8 @@ public class SseBinServer implements IEventsHandler {
         SseBinary sseBinary = new SseBinary();
         sseBinary.setMsgType(103);
         sseBinary.setBody(report);
-
+        sseBinary.setMsgSeqNum(msgSeqNum.getAndIncrement());
+        log.info("Sending report: {}" , report);
         ByteBuf buf = Unpooled.buffer();
         sseBinary.encode(buf);
         channel.writeAndFlush(buf);
@@ -167,8 +171,10 @@ public class SseBinServer implements IEventsHandler {
 
     private void sendConfirm(Channel channel, Confirm confirm) {
         SseBinary sseBinary = new SseBinary();
+        sseBinary.setMsgSeqNum(msgSeqNum.getAndIncrement());
         sseBinary.setMsgType(32);
         sseBinary.setBody(confirm);
+        log.info("Sending confirm: {}" , confirm);
         ByteBuf buf = Unpooled.buffer();
         sseBinary.encode(buf);
         channel.writeAndFlush(buf);
