@@ -102,6 +102,10 @@ public class SseBinServer implements IEventsHandler {
     }
 
     private void sendReport(Channel channel, Report report) {
+        if (!channel.isActive()){
+            log.warn("Channel is not active, cannot send report: {}" , report);
+            return;
+        }
         SseBinary sseBinary = new SseBinary();
         sseBinary.setMsgType(103);
         sseBinary.setBody(report);
@@ -170,6 +174,10 @@ public class SseBinServer implements IEventsHandler {
     }
 
     private void sendConfirm(Channel channel, Confirm confirm) {
+        if (!channel.isActive()) {
+            log.warn("Channel is not active, cannot send confirm: {}" , confirm);
+            return;
+        }
         SseBinary sseBinary = new SseBinary();
         sseBinary.setMsgSeqNum(msgSeqNum.getAndIncrement());
         sseBinary.setMsgType(32);

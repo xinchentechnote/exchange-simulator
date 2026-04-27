@@ -1,9 +1,11 @@
 package com.xinchentechnote.exchange.gateway.sse;
 
+import com.xinchentechnote.exchange.gateway.utils.NettyLoggingUtil;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
+import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 
 public class SseBinServerInitializer extends ChannelInitializer<SocketChannel> {
@@ -21,6 +23,9 @@ public class SseBinServerInitializer extends ChannelInitializer<SocketChannel> {
         //MsgType uint32 消息类型
         //MsgSeqNum uint64 消息序号
         //MsgBodyLen uint32 消息体长度
+        if (NettyLoggingUtil.isLoggingEnabled()) {
+            pipeline.addLast(NettyLoggingUtil.getLoggingHandlerName(), new LoggingHandler(NettyLoggingUtil.getLoggingLevel()));
+        }
         pipeline.addLast(Constant.FRAME, new LengthFieldBasedFrameDecoder(1024 * 1024, // 最大帧长度
                 12,           // 长度字段偏移量（MsgType占4字节）
                 4,           // 长度字段长度（MsgSeqNum占8字节）
