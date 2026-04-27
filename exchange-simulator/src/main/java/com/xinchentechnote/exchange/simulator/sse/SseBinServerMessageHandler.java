@@ -10,7 +10,6 @@ import lombok.extern.log4j.Log4j2;
 public class SseBinServerMessageHandler extends SimpleChannelInboundHandler<SseBinary> {
 
     private final SseBinServer sseBinServer;
-    private int heartbeatTimeoutCounter = 0;
 
     public SseBinServerMessageHandler(SseBinServer sseBinServer) {
         this.sseBinServer = sseBinServer;
@@ -35,22 +34,11 @@ public class SseBinServerMessageHandler extends SimpleChannelInboundHandler<SseB
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, SseBinary sseBinary) throws Exception {
-        heartbeatTimeoutCounter = 0;
         log.debug("Received msg: {}", sseBinary);
         if (sseBinary.getMsgType() != SseBinary.BodyMessageFactory.MessageType.HEARTBEAT.getValue()) {
             sseBinServer.onMessage(sseBinary, ctx.channel());
         }
     }
 
-    @Override
-    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-        if (evt instanceof IdleStateEvent) {
-            heartbeatTimeoutCounter++;
-            if (heartbeatTimeoutCounter >= 3) {
-                log.warn("Idle timeout, closing connection: {}", ctx.channel().remoteAddress());
-//                ctx.close();
-            }
-        }
-        super.userEventTriggered(ctx, evt);
-    }
+
 }

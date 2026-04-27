@@ -15,6 +15,8 @@ import java.util.concurrent.TimeUnit;
 @Log4j2
 public class SseBinServerConnectionHandler extends SimpleChannelInboundHandler<ByteBuf> {
 
+    private int heartbeatTimeoutCounter = 0;
+
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         log.info("New connection from " + ctx.channel().remoteAddress());
@@ -37,6 +39,7 @@ public class SseBinServerConnectionHandler extends SimpleChannelInboundHandler<B
         ByteBuf decodeBuf = msg.duplicate();
         SseBinary sseBinary = new SseBinary();
         sseBinary.decode(decodeBuf);
+        heartbeatTimeoutCounter = 0;
         log.debug("Received msg: {}", sseBinary);
         SseBinary.BodyMessageFactory.MessageType messageType = SseBinary.BodyMessageFactory.MessageType.fromValue(sseBinary.getMsgType());
         switch (messageType) {
@@ -88,8 +91,11 @@ public class SseBinServerConnectionHandler extends SimpleChannelInboundHandler<B
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
         if (evt instanceof IdleStateEvent) {
-            //TODO 超时检测
-            log.warn("Idle timeout, closing connection: {}", ctx.channel().remoteAddress());
+            heartbeatTimeoutCounter++;
+            if (heartbeatTimeoutCounter >= 3) {
+                log.warn("Idle timeout, closing connection: {}", ctx.channel().remoteAddress());
+                ctx.close();
+            }
         }
         super.userEventTriggered(ctx, evt);
     }
