@@ -46,7 +46,7 @@ public class SseBinServer implements IEventsHandler {
     public void start() {
         ServerBootstrap bootstrap = new ServerBootstrap();
         NioEventLoopGroup group = new NioEventLoopGroup(1);
-        NioEventLoopGroup workGroup = new NioEventLoopGroup(3);
+        NioEventLoopGroup workGroup = new NioEventLoopGroup(2);
         bootstrap.group(group, workGroup)
                 .channel(NioServerSocketChannel.class)
                 .childHandler(new SseBinServerInitializer(this));
