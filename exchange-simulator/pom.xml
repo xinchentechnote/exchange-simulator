@@ -84,6 +84,11 @@
             <artifactId>sse-bin</artifactId>
             <version>1.0.0</version>
         </dependency>
+        <dependency>
+            <groupId>com.xinchentechnote.finproto</groupId>
+            <artifactId>szse-bin</artifactId>
+            <version>1.0.0</version>
+        </dependency>
 
     </dependencies>
 
