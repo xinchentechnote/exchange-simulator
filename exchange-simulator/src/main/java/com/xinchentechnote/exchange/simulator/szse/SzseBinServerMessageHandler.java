@@ -10,5 +10,6 @@ public class SzseBinServerMessageHandler extends SimpleChannelInboundHandler<Szs
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, SzseBinary msg) throws Exception {
             log.info("Received message: {}", msg);
+
     }
 }

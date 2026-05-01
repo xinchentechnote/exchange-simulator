@@ -63,9 +63,11 @@ public class SseBinServerConnectionHandler extends SimpleChannelInboundHandler<B
                 Logon logon = (Logon) sseBinary.getBody();
                 //登录逻辑
                 ctx.channel().attr(Constant.LOGON).set(true);
-                short heartBtInt = logon.getHeartBtInt();
-                pipeline.remove(Constant.IDLE);
-                pipeline.addAfter(Constant.CONNECTION, Constant.IDLE, new IdleStateHandler(heartBtInt, 0, 0));
+                int heartBtInt = HeartBtIntUtil.calculate(logon.getHeartBtInt());
+                if (!HeartBtIntUtil.isMin(heartBtInt)){
+                    pipeline.remove(Constant.IDLE);
+                    pipeline.addAfter(Constant.CONNECTION, Constant.IDLE, new IdleStateHandler(heartBtInt, 0, 0));
+                }
                 break;
             case LOGOUT:
                 //登出逻辑
@@ -76,7 +78,7 @@ public class SseBinServerConnectionHandler extends SimpleChannelInboundHandler<B
                 }
                 msg.retain().resetReaderIndex();
                 ctx.channel().writeAndFlush(msg);
-                ctx.executor().schedule(() -> ctx.close(), 3, TimeUnit.SECONDS);
+                ctx.executor().schedule(() -> ctx.close(), 1, TimeUnit.SECONDS);
                 break;
             default:
                 if (!ctx.channel().attr(Constant.LOGON).get()) {
