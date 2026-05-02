@@ -2,6 +2,7 @@ package com.xinchentechnote.exchange.simulator.sse.cmd;
 
 import com.finproto.sse.bin.messages.NewOrderSingle;
 import com.xinchentechnote.exchange.simulator.GlobalUniqueId;
+import com.xinchentechnote.exchange.simulator.convertor.cmd.IApiCommandConverter;
 import exchange.core2.core.common.OrderAction;
 import exchange.core2.core.common.OrderType;
 import exchange.core2.core.common.api.ApiPlaceOrder;

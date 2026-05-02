@@ -5,8 +5,8 @@ import com.finproto.sse.bin.messages.Confirm;
 import com.finproto.sse.bin.messages.NewOrderSingle;
 import com.finproto.sse.bin.messages.Report;
 import com.finproto.sse.bin.messages.SseBinary;
-import com.xinchentechnote.exchange.simulator.sse.cmd.ApiCommandConvertorContext;
-import com.xinchentechnote.exchange.simulator.sse.cmd.IApiCommandConverter;
+import com.xinchentechnote.exchange.simulator.convertor.cmd.ApiCommandConvertorContext;
+import com.xinchentechnote.exchange.simulator.convertor.cmd.IApiCommandConverter;
 import com.xinchentechnote.exchange.simulator.sse.trade.SseTradeEventReportConvertor;
 import com.xinchentechnote.exchange.simulator.sse.trade.SseTradeReportConvertor;
 import exchange.core2.core.ExchangeApi;
@@ -140,7 +140,7 @@ public class SseBinServer implements IEventsHandler {
             if (commandWrapper != null) {
                 switch (commandResult.getResultCode()) {
                     case SUCCESS:
-                        SseBinary originMsg = commandWrapper.getOriginMsg();
+                        SseBinary originMsg = (SseBinary) commandWrapper.getOriginMsg();
                         NewOrderSingle orderSingle = (NewOrderSingle) originMsg.getBody();
                         Confirm confirm = new Confirm();
                         confirm.setAccount(orderSingle.getAccount());

@@ -7,9 +7,17 @@ import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class SzseBinServerMessageHandler extends SimpleChannelInboundHandler<SzseBinary> {
-    @Override
-    protected void channelRead0(ChannelHandlerContext ctx, SzseBinary msg) throws Exception {
-            log.info("Received message: {}", msg);
+    private SzseBinServer szseBinServer;
 
+    public SzseBinServerMessageHandler(SzseBinServer szseBinServer) {
+        this.szseBinServer = szseBinServer;
+    }
+
+    @Override
+    protected void channelRead0(ChannelHandlerContext ctx, SzseBinary szseBinary) throws Exception {
+        log.debug("Received msg: {}", szseBinary);
+        if (szseBinary.getMsgType() != 3) {
+            szseBinServer.onMessage(szseBinary, ctx.channel());
+        }
     }
 }

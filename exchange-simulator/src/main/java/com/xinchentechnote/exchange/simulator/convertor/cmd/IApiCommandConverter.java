@@ -1,4 +1,4 @@
-package com.xinchentechnote.exchange.simulator.sse.cmd;
+package com.xinchentechnote.exchange.simulator.convertor.cmd;
 
 import com.finproto.codec.BinaryCodec;
 import exchange.core2.core.common.api.ApiCommand;

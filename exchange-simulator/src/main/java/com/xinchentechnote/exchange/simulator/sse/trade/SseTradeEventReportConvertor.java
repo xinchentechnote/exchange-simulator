@@ -4,6 +4,7 @@ import com.finproto.codec.BinaryCodec;
 import com.finproto.sse.bin.messages.NewOrderSingle;
 import com.finproto.sse.bin.messages.Report;
 import com.finproto.sse.bin.messages.SseBinary;
+import com.xinchentechnote.exchange.simulator.convertor.trade.IReportConvertor;
 import com.xinchentechnote.exchange.simulator.sse.CommandWrapper;
 import exchange.core2.core.IEventsHandler;
 
@@ -11,7 +12,7 @@ public class SseTradeEventReportConvertor implements IReportConvertor<IEventsHan
 
     @Override
     public Report convert(IEventsHandler.TradeEvent tradeEvent, CommandWrapper requestWrapper) {
-        SseBinary originMsg = requestWrapper.getOriginMsg();
+        SseBinary originMsg =(SseBinary) requestWrapper.getOriginMsg();
         BinaryCodec body = originMsg.getBody();
         Report report = new Report();
         if (body instanceof NewOrderSingle) {

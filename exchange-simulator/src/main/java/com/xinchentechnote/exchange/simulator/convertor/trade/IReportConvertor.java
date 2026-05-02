@@ -1,4 +1,4 @@
-package com.xinchentechnote.exchange.simulator.sse.trade;
+package com.xinchentechnote.exchange.simulator.convertor.trade;
 
 import com.xinchentechnote.exchange.simulator.sse.CommandWrapper;
 

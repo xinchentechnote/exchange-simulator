@@ -10,6 +10,12 @@ import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 
 class SzseBinServerInitializer extends ChannelInitializer<SocketChannel> {
+    private SzseBinServer szseBinServer;
+
+    public SzseBinServerInitializer(SzseBinServer szseBinServer) {
+        this.szseBinServer = szseBinServer;
+    }
+
     @Override
     protected void initChannel(SocketChannel ch) throws Exception {
         ChannelPipeline pipeline = ch.pipeline();
@@ -26,6 +32,6 @@ class SzseBinServerInitializer extends ChannelInitializer<SocketChannel> {
         ));
         pipeline.addLast(Constant.CONNECTION, new SzseBinServerConnectionHandler());//登录、登出、心跳处理
         pipeline.addLast(Constant.IDLE, new IdleStateHandler(3,0,0));
-        pipeline.addLast(Constant.MESSAGE, new SzseBinServerMessageHandler());//业务处理
+        pipeline.addLast(Constant.MESSAGE, new SzseBinServerMessageHandler(this.szseBinServer));//业务处理
     }
 }

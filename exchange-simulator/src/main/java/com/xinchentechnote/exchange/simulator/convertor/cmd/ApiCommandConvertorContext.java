@@ -1,6 +1,8 @@
-package com.xinchentechnote.exchange.simulator.sse.cmd;
+package com.xinchentechnote.exchange.simulator.convertor.cmd;
 
 import com.finproto.codec.BinaryCodec;
+import com.xinchentechnote.exchange.simulator.sse.cmd.SseApiCommandConverter;
+import com.xinchentechnote.exchange.simulator.szse.cmd.SzseApiCommandConverter;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -15,6 +17,7 @@ public class ApiCommandConvertorContext {
     private ApiCommandConvertorContext() {
         // Register convertors here
         registerConvertor(new SseApiCommandConverter());
+        registerConvertor(new SzseApiCommandConverter());
     }
 
     private final Map<Class<?>, IApiCommandConverter<?,?>> convertorMap = new HashMap<>();
