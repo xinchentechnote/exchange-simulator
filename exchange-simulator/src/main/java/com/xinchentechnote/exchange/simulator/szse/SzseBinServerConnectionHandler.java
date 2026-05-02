@@ -49,7 +49,7 @@ public class SzseBinServerConnectionHandler extends SimpleChannelInboundHandler<
             pipeline.addAfter(Constant.CONNECTION, Constant.IDLE, new IdleStateHandler(heartBtint,0,0));
         } else if (body instanceof Logout){
             if (!ctx.channel().attr(Constant.LOGON).get()) {
-                log.debug("Received non-logon message before login, closing connection: {}", ctx.channel().remoteAddress());
+                log.warn("Received non-logon message before login, closing connection: {}", ctx.channel().remoteAddress());
                 ctx.close();
                 return;
             }
