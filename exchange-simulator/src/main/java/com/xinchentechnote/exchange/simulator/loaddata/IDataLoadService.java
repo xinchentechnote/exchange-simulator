@@ -1,4 +1,4 @@
-package com.xinchentechnote.exchange.simulator.sse.loaddata;
+package com.xinchentechnote.exchange.simulator.loaddata;
 
 import java.util.List;
 

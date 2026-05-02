@@ -1,15 +1,19 @@
 package com.xinchentechnote.exchange.simulator.szse;
 
+import exchange.core2.core.ExchangeApi;
+import exchange.core2.core.IEventsHandler;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import lombok.Data;
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
-public class SzseBinServer {
+@Data
+public class SzseBinServer implements IEventsHandler {
     private final int port;
-
+    private ExchangeApi api;
     public SzseBinServer(int port) {
         this.port = port;
     }
@@ -31,4 +35,28 @@ public class SzseBinServer {
         });
     }
 
+    @Override
+    public void commandResult(ApiCommandResult commandResult) {
+        log.info("Received command result: {}", commandResult);
+    }
+
+    @Override
+    public void tradeEvent(TradeEvent tradeEvent) {
+        log.info("Received trade event: {}", tradeEvent);
+    }
+
+    @Override
+    public void rejectEvent(RejectEvent rejectEvent) {
+        log.info("Received reject event: {}", rejectEvent);
+    }
+
+    @Override
+    public void reduceEvent(ReduceEvent reduceEvent) {
+        log.info("Received reduce event: {}", reduceEvent);
+    }
+
+    @Override
+    public void orderBook(OrderBook orderBook) {
+        log.info("Received order book update: {}", orderBook);
+    }
 }

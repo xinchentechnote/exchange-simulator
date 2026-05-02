@@ -1,4 +1,4 @@
-package com.xinchentechnote.exchange.simulator.sse.loaddata;
+package com.xinchentechnote.exchange.simulator.loaddata;
 
 import com.google.common.io.Files;
 import exchange.core2.core.common.CoreSymbolSpecification;

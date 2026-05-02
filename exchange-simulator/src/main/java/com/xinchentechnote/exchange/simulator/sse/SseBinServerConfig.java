@@ -1,8 +1,8 @@
 package com.xinchentechnote.exchange.simulator.sse;
 
 import com.xinchentechnote.exchange.simulator.GlobalUniqueId;
-import com.xinchentechnote.exchange.simulator.sse.loaddata.AccountInfoLoadService;
-import com.xinchentechnote.exchange.simulator.sse.loaddata.SymbolInfoLoadService;
+import com.xinchentechnote.exchange.simulator.loaddata.AccountInfoLoadService;
+import com.xinchentechnote.exchange.simulator.loaddata.SymbolInfoLoadService;
 import exchange.core2.core.ExchangeApi;
 import exchange.core2.core.ExchangeCore;
 import exchange.core2.core.SimpleEventsProcessor;
@@ -42,7 +42,7 @@ public class SseBinServerConfig implements InitializingBean {
     @Bean
     public SseBinServer sseBinServer() {
         SseBinServer sseBinServer = new SseBinServer(this.port);
-        ExchangeApi exchangeApi = exchangeApi(sseBinServer);
+        ExchangeApi exchangeApi = creatExchangeApi(sseBinServer);
         sseBinServer.setApi(exchangeApi);
         initBaseInfo(exchangeApi);
         sseBinServer.start();
@@ -67,7 +67,7 @@ public class SseBinServerConfig implements InitializingBean {
 
     }
 
-    public ExchangeApi exchangeApi(SseBinServer sseBinServer) {
+    public ExchangeApi creatExchangeApi(SseBinServer sseBinServer) {
         // simple async events handler
         SimpleEventsProcessor eventsProcessor = new SimpleEventsProcessor(sseBinServer);
 
