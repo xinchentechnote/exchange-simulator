@@ -7,6 +7,7 @@ import com.finproto.sse.bin.messages.Report;
 import com.finproto.sse.bin.messages.SseBinary;
 import com.xinchentechnote.exchange.simulator.convertor.cmd.ApiCommandConvertorContext;
 import com.xinchentechnote.exchange.simulator.convertor.cmd.IApiCommandConverter;
+import com.xinchentechnote.exchange.simulator.sse.confirm.SseConfirmConvertor;
 import com.xinchentechnote.exchange.simulator.sse.trade.SseTradeEventReportConvertor;
 import com.xinchentechnote.exchange.simulator.sse.trade.SseTradeReportConvertor;
 import exchange.core2.core.ExchangeApi;
@@ -52,9 +53,9 @@ public class SseBinServer implements IEventsHandler {
                 .childHandler(new SseBinServerInitializer(this));
         bootstrap.bind(port).addListener(future -> {
             if (future.isSuccess()) {
-                log.info("SseBinServer started on port :{}" , port);
+                log.info("SseBinServer started on port :{}", port);
             } else {
-                log.error("Failed to start SseBinServer on port :{},{}" , port,future.cause());
+                log.error("Failed to start SseBinServer on port :{},{}", port, future.cause());
             }
         });
     }
@@ -64,11 +65,11 @@ public class SseBinServer implements IEventsHandler {
         BinaryCodec body = msg.getBody();
         IApiCommandConverter converter = ApiCommandConvertorContext.getInstance().get(body);
         if (converter == null) {
-            log.error("No converter found for msg type: {}" , msg.getMsgType());
+            log.error("No converter found for msg type: {}", msg.getMsgType());
             return;
         }
         ApiCommand apiCommand = converter.convertNewOrder(body);
-        if (apiCommand instanceof ApiPlaceOrder){
+        if (apiCommand instanceof ApiPlaceOrder) {
             CommandWrapper commandWrapper = new CommandWrapper();
             commandWrapper.setUniqueId(((ApiPlaceOrder) apiCommand).orderId);
             commandWrapper.setApiCommand(apiCommand);
@@ -81,7 +82,7 @@ public class SseBinServer implements IEventsHandler {
 
     @Override
     public void tradeEvent(TradeEvent tradeEvent) {
-        log.info("Trade event: {}" , tradeEvent);
+        log.info("Trade event: {}", tradeEvent);
         long takerOrderId = tradeEvent.getTakerOrderId();
         CommandWrapper commandWrapper = cache.get(takerOrderId);
         SseTradeEventReportConvertor reportConvertor = new SseTradeEventReportConvertor();
@@ -95,22 +96,22 @@ public class SseBinServer implements IEventsHandler {
             for (Trade trade : trades) {
                 CommandWrapper origin = cache.get(trade.getMakerOrderId());
                 Report rep = sseTradeReportConvertor.convert(trade, origin);
-                sendReport(origin.getChannel(),rep);
+                sendReport(origin.getChannel(), rep);
             }
         }
 
     }
 
     private void sendReport(Channel channel, Report report) {
-        if (!channel.isActive()){
-            log.warn("Channel is not active, cannot send report: {}" , report);
+        if (!channel.isActive()) {
+            log.warn("Channel is not active, cannot send report: {}", report);
             return;
         }
         SseBinary sseBinary = new SseBinary();
         sseBinary.setMsgType(103);
         sseBinary.setBody(report);
         sseBinary.setMsgSeqNum(msgSeqNum.getAndIncrement());
-        log.info("Sending report: {}" , report);
+        log.info("Sending report: {}", report);
         ByteBuf buf = Unpooled.buffer();
         sseBinary.encode(buf);
         channel.writeAndFlush(buf);
@@ -119,55 +120,31 @@ public class SseBinServer implements IEventsHandler {
     @Override
     public void reduceEvent(ReduceEvent reduceEvent) {
         //暂不处理
-        log.info("Reduce event: {}" , reduceEvent);
+        log.info("Reduce event: {}", reduceEvent);
     }
 
     @Override
     public void rejectEvent(RejectEvent rejectEvent) {
         //拒绝，委托拒绝和撤单拒绝
-        log.info("Reject event: {}" , rejectEvent);
+        log.info("Reject event: {}", rejectEvent);
     }
 
     @Override
     public void commandResult(ApiCommandResult commandResult) {
         //委托确认
-        log.info("Command result: {}" , commandResult);
+        log.info("Command result: {}", commandResult);
         ApiCommand command = commandResult.getCommand();
+        SseConfirmConvertor confirmConvertor = new SseConfirmConvertor();
         if (command instanceof ApiPlaceOrder) {
             ApiPlaceOrder apiPlaceOrder = (ApiPlaceOrder) command;
             long orderId = apiPlaceOrder.orderId;
             CommandWrapper commandWrapper = cache.get(orderId);
             if (commandWrapper != null) {
-                switch (commandResult.getResultCode()) {
-                    case SUCCESS:
-                        SseBinary originMsg = (SseBinary) commandWrapper.getOriginMsg();
-                        NewOrderSingle orderSingle = (NewOrderSingle) originMsg.getBody();
-                        Confirm confirm = new Confirm();
-                        confirm.setAccount(orderSingle.getAccount());
-                        confirm.setSecurityId(orderSingle.getSecurityId());
-                        confirm.setClOrdId(orderSingle.getClOrdId());
-                        confirm.setBizId(orderSingle.getBizId());
-                        confirm.setBranchId(orderSingle.getBranchId());
-                        confirm.setBizPbu(orderSingle.getBizPbu());
-                        confirm.setPbu(orderSingle.getBizPbu());
-                        confirm.setSide(orderSingle.getSide());
-                        confirm.setOrderQty(orderSingle.getOrderQty());
-                        confirm.setPrice(orderSingle.getPrice());
-                        confirm.setExecType("0");
-                        confirm.setUserInfo(orderSingle.getUserInfo());
-                        confirm.setTransactTime(orderSingle.getTransactTime());
-                        confirm.setTradeDate((int) (orderSingle.getTransactTime()/1000_000));
-                        confirm.setClearingFirm(orderSingle.getClearingFirm());
-                        confirm.setCreditTag(orderSingle.getCreditTag());
-                        confirm.setOrdStatus("0");
-                        confirm.setTimeInForce(orderSingle.getTimeInForce());
-                        confirm.setOrdType(orderSingle.getOrdType());
-                        confirm.setLeavesQty(orderSingle.getOrderQty());
-                        confirm.setOwnerType(orderSingle.getOwnerType());
-                        sendConfirm(commandWrapper.getChannel(), confirm);
-                        break;
-                    default:
-                        // 其他结果码暂不处理
+                SseBinary originMsg = (SseBinary) commandWrapper.getOriginMsg();
+                if (originMsg.getBody() instanceof NewOrderSingle) {
+                    NewOrderSingle orderSingle = (NewOrderSingle) originMsg.getBody();
+                    Confirm confirm = confirmConvertor.convert(orderSingle, commandResult);
+                    sendConfirm(commandWrapper.getChannel(), confirm);
                 }
             }
         }
@@ -175,14 +152,14 @@ public class SseBinServer implements IEventsHandler {
 
     private void sendConfirm(Channel channel, Confirm confirm) {
         if (!channel.isActive()) {
-            log.warn("Channel is not active, cannot send confirm: {}" , confirm);
+            log.warn("Channel is not active, cannot send confirm: {}", confirm);
             return;
         }
         SseBinary sseBinary = new SseBinary();
         sseBinary.setMsgSeqNum(msgSeqNum.getAndIncrement());
         sseBinary.setMsgType(32);
         sseBinary.setBody(confirm);
-        log.info("Sending confirm: {}" , confirm);
+        log.info("Sending confirm: {}", confirm);
         ByteBuf buf = Unpooled.buffer();
         sseBinary.encode(buf);
         channel.writeAndFlush(buf);
@@ -191,6 +168,6 @@ public class SseBinServer implements IEventsHandler {
     @Override
     public void orderBook(OrderBook orderBook) {
         //行情发布
-        log.info("OrderBook event: {}" , orderBook);
+        log.info("OrderBook event: {}", orderBook);
     }
 }
