@@ -3,14 +3,13 @@ package com.xinchentechnote.exchange.simulator.szse;
 import com.finproto.codec.BinaryCodec;
 import com.finproto.sse.bin.messages.Report;
 import com.finproto.sse.bin.messages.SseBinary;
-import com.finproto.szse.bin.messages.ExecutionReport;
-import com.finproto.szse.bin.messages.Extend200115;
-import com.finproto.szse.bin.messages.SzseBinary;
+import com.finproto.szse.bin.messages.*;
 import com.xinchentechnote.exchange.simulator.convertor.cmd.ApiCommandConvertorContext;
 import com.xinchentechnote.exchange.simulator.convertor.cmd.IApiCommandConverter;
 import com.xinchentechnote.exchange.simulator.sse.CommandWrapper;
 import com.xinchentechnote.exchange.simulator.sse.trade.SseTradeEventReportConvertor;
 import com.xinchentechnote.exchange.simulator.sse.trade.SseTradeReportConvertor;
+import com.xinchentechnote.exchange.simulator.szse.confirm.SzseConfirmConvertor;
 import com.xinchentechnote.exchange.simulator.szse.trade.SzseTradeEventReportConvertor;
 import com.xinchentechnote.exchange.simulator.szse.trade.SzseTradeReportConvertor;
 import exchange.core2.core.ExchangeApi;
@@ -64,7 +63,34 @@ public class SzseBinServer implements IEventsHandler {
     @Override
     public void commandResult(ApiCommandResult commandResult) {
         log.info("Received command result: {}", commandResult);
-        //TODO confirm
+        ApiCommand command = commandResult.getCommand();
+        if (command instanceof ApiPlaceOrder) {
+            CommandWrapper commandWrapper = cache.get(((ApiPlaceOrder) command).orderId);
+            if (null != commandWrapper) {
+                SzseBinary originMsg = (SzseBinary) commandWrapper.getOriginMsg();
+                if (originMsg.getBody() instanceof NewOrder){
+                    SzseConfirmConvertor convertor = new SzseConfirmConvertor();
+                    ExecutionConfirm confirm = convertor.convert((NewOrder) originMsg.getBody(), commandResult);
+                    sendConfirm(commandWrapper.getChannel(), confirm);
+                }
+            }
+        }
+    }
+
+
+    private void sendConfirm(Channel channel, ExecutionConfirm confirm) {
+        if (!channel.isActive()){
+            log.warn("Channel is not active, cannot send confirm: {}" , confirm);
+            return;
+        }
+        confirm.setApplExtend(new Extend200102());
+        SzseBinary szseBinary = new SzseBinary();
+        szseBinary.setMsgType(200102);
+        szseBinary.setBody(confirm);
+        log.info("Sending confirm: {}" , confirm);
+        ByteBuf buf = Unpooled.buffer();
+        szseBinary.encode(buf);
+        channel.writeAndFlush(buf);
     }
 
     @Override
