@@ -71,7 +71,9 @@ public class SzseBinServer implements IEventsHandler {
                 if (originMsg.getBody() instanceof NewOrder){
                     SzseConfirmConvertor convertor = new SzseConfirmConvertor();
                     ExecutionConfirm confirm = convertor.convert((NewOrder) originMsg.getBody(), commandResult);
-                    sendConfirm(commandWrapper.getChannel(), confirm);
+                    if (confirm != null) {
+                        sendConfirm(commandWrapper.getChannel(), confirm);
+                    }
                 }
             }
         }

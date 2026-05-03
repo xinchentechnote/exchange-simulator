@@ -144,7 +144,9 @@ public class SseBinServer implements IEventsHandler {
                 if (originMsg.getBody() instanceof NewOrderSingle) {
                     NewOrderSingle orderSingle = (NewOrderSingle) originMsg.getBody();
                     Confirm confirm = confirmConvertor.convert(orderSingle, commandResult);
-                    sendConfirm(commandWrapper.getChannel(), confirm);
+                    if (confirm != null) {
+                        sendConfirm(commandWrapper.getChannel(), confirm);
+                    }
                 }
             }
         }
