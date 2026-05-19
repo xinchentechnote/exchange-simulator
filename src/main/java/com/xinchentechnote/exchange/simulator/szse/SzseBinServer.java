@@ -90,9 +90,14 @@ public class SzseBinServer implements IEventsHandler {
         szseBinary.setMsgType(200102);
         szseBinary.setBody(confirm);
         log.info("Sending confirm: {}" , confirm);
-        ByteBuf buf = Unpooled.buffer();
-        szseBinary.encode(buf);
-        channel.writeAndFlush(buf);
+        ByteBuf buf = channel.alloc().buffer(1024);
+        try {
+            szseBinary.encode(buf);
+            channel.writeAndFlush(buf);
+        } catch (Exception e) {
+            buf.release();
+            log.error("Failed to send confirm: {}", confirm, e);
+        }
     }
 
     @Override
@@ -126,9 +131,14 @@ public class SzseBinServer implements IEventsHandler {
         szseBinary.setMsgType(200115);
         szseBinary.setBody(report);
         log.info("Sending report: {}" , report);
-        ByteBuf buf = Unpooled.buffer();
-        szseBinary.encode(buf);
-        channel.writeAndFlush(buf);
+        ByteBuf buf = channel.alloc().buffer(1024);
+        try {
+            szseBinary.encode(buf);
+            channel.writeAndFlush(buf);
+        } catch (Exception e) {
+            buf.release();
+            log.error("Failed to send report: {}", report, e);
+        }
     }
 
     @Override
