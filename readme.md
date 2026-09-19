@@ -30,6 +30,25 @@ docker run --rm -p 8080:8080 -p 9010:9010 -p 9011:9011 exchange-simulator
 
 证券与账户基础数据位于 `data/{sse,szse}/*.csv`（格式说明见设计文档 §3.5）。
 
+## 本地测试
+
+```shell
+./local-test.sh            # 全部阶段：unit(编译+单测+打包) → boot(JDK8启动冒烟) → e2e(gt-auto协议回归)
+./local-test.sh unit boot  # 只跑指定阶段；JDK8 可用 JAVA8_HOME 或 --jdk8 指定
+```
+
+无 JDK 8 / gt-auto 时对应阶段自动跳过（SKIP），不影响其他阶段。
+
+## CI
+
+`.github/workflows/ci.yml`（push / PR / 手动触发）：
+
+| Job | 内容 |
+| --- | --- |
+| build-test | JDK 8 + 17 矩阵执行 `mvn clean verify`，JDK 8 产物上传 artifact |
+| smoke-test | JDK 8 启动打包产物，做 HTTP 冒烟（复用 `local-test.sh boot`） |
+| protocol-e2e | JDK 8 + gt-auto 跑 SSE 协议回归（复用 `local-test.sh e2e`） |
+
 ## 自动化回归
 
 依赖 [gt-auto](https://github.com/xinchentechnote/gt-auto) 测试工具：

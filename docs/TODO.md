@@ -18,8 +18,8 @@
 
 - [x] **P0-1 运行时仅能在 JDK 8 下启动** 🔧（部分处理）
   exchange-core 0.5.3 → chronicle-bytes 2.19.1 仅兼容 JDK 8（Maven Central 上无更新版本，升级路线不通）。
-  已完成：Dockerfile 固化 JDK 8 运行时、readme/设计文档明确约束、提供 Zulu 8 验证记录。
-  待办：CI 固定 JDK 8 构建；如需 JDK 11+ 需等待或自行维护 exchange-core 的 chronicle 升级。
+  已完成：Dockerfile 固化 JDK 8 运行时、readme/设计文档明确约束、提供 Zulu 8 验证记录；CI 构建矩阵 JDK 8（产物）+ JDK 17（兼容性哨兵），运行时冒烟仅在 JDK 8。
+  待办：如需 JDK 11+ 需等待或自行维护 exchange-core 的 chronicle 升级。
 
 - [x] **P0-2 心跳空闲超时检测是死代码** ✅
   `IdleStateHandler` 已移到 ConnectionHandler 之前（两个 Initializer 均调整顺序）；登录时改用 `pipeline.replace` 重建。
@@ -94,8 +94,8 @@
   未做：同步等待订单状态（原 javadoc 描述的"等 3 秒返回状态"实现）；`OrderResponse`/`OrderResult` DTO 接入。
 
 - [x] **P2-20 测试与交付工程化** 🔧
-  已完成：新增 10 个测试类 38 个用例（转换器映射、确认回执、会话层管线、按会话序号、缓存清理、CSV fail-fast、参数校验）；pom 补 surefire 2.22.2（此前 JUnit 5 用例根本不会执行）；Dockerfile（JDK 8 基础镜像，含 data 目录）。
-  未做：SZSE 协议回归用例（gt-auto testcase）；CI 流水线。
+  已完成：新增 10 个测试类 38 个用例（转换器映射、确认回执、会话层管线、按会话序号、缓存清理、CSV fail-fast、参数校验）；pom 补 surefire 2.22.2（此前 JUnit 5 用例根本不会执行）；Dockerfile（JDK 8 基础镜像，含 data 目录）；`local-test.sh` 本地基础测试脚本（unit/boot/e2e 三阶段，条件不足自动跳过）；GitHub Actions CI（`.github/workflows/ci.yml`：JDK 8+17 构建矩阵、JDK 8 产物冒烟、gt-auto 协议回归，后两者复用本地脚本）。
+  未做：SZSE 协议回归用例（gt-auto testcase 缺失，补齐后可在 CI 的 protocol-e2e job 一并执行）。
 
 - [x] **P2-21 其他小项** ✅
   `HeartBtIntUtil.isMin` 移除；SZSE Initializer 改为 public 与 SSE 一致；`setApplExtend` 内聚到 SZSE 转换器；`cache`/`port` 等 field final 化；初始化器泛型放宽为 `ChannelInitializer<Channel>`（兼容 EmbeddedChannel 测试，生产行为不变）。
@@ -122,13 +122,13 @@
 ## 本地验证方式（修复后）
 
 ```shell
-# 单元测试（任意 JDK）
-mvn test
+# 一键基础测试（unit + boot + e2e，条件不足自动跳过）
+./local-test.sh
 
-# 完整运行（必须 JDK 8）
-mvn package -DskipTests
-java -jar target/exchange-simulator-1.0-SNAPSHOT.jar   # JDK 8
+# 或分阶段
+./local-test.sh unit        # 编译 + 38 个单元测试 + 打包（任意 JDK）
+./local-test.sh boot        # JDK 8 启动冒烟（需 JAVA8_HOME 或 --jdk8）
+./local-test.sh e2e         # gt-auto SSE 协议回归（另需 gt-auto）
 
-# SSE 端到端回归（需 gt-auto，应用启动后执行）
-./autotest.sh
+# CI 同款流程见 .github/workflows/ci.yml
 ```
