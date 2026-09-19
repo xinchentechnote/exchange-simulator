@@ -6,9 +6,10 @@ import com.xinchentechnote.exchange.simulator.convertor.cmd.IApiCommandConverter
 import exchange.core2.core.common.OrderAction;
 import exchange.core2.core.common.OrderType;
 import exchange.core2.core.common.api.ApiPlaceOrder;
-import org.springframework.stereotype.Component;
 
-@Component
+/**
+ * 非Spring管理，由 {@link com.xinchentechnote.exchange.simulator.convertor.cmd.ApiCommandConvertorContext} 手动注册。
+ */
 public class SseApiCommandConverter implements IApiCommandConverter<NewOrderSingle, ApiPlaceOrder> {
 
     @Override

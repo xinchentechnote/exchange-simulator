@@ -2,8 +2,8 @@ package com.xinchentechnote.exchange.simulator.sse.confirm;
 
 import com.finproto.sse.bin.messages.Confirm;
 import com.finproto.sse.bin.messages.NewOrderSingle;
+import com.xinchentechnote.exchange.simulator.common.ExecType;
 import com.xinchentechnote.exchange.simulator.convertor.CommandResultConvertor;
-import com.xinchentechnote.exchange.simulator.sse.ExecType;
 import exchange.core2.core.IEventsHandler;
 
 public class SseConfirmConvertor implements CommandResultConvertor<NewOrderSingle, Confirm> {
@@ -19,10 +19,10 @@ public class SseConfirmConvertor implements CommandResultConvertor<NewOrderSingl
             case RISK_INVALID_RESERVE_BID_PRICE:
             case RISK_ASK_PRICE_LOWER_THAN_FEE:
             case USER_MGMT_USER_NOT_FOUND:
+            default:
+                //未映射的结果码一律按申报拒绝下发，保证客户端总能收到回执
                 execType = ExecType.REJECTED;
                 break;
-            default:
-                return null;
         }
         Confirm confirm = new Confirm();
         confirm.setAccount(orderSingle.getAccount());

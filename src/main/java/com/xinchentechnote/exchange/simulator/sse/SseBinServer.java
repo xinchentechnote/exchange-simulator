@@ -5,6 +5,9 @@ import com.finproto.sse.bin.messages.Confirm;
 import com.finproto.sse.bin.messages.NewOrderSingle;
 import com.finproto.sse.bin.messages.Report;
 import com.finproto.sse.bin.messages.SseBinary;
+import com.xinchentechnote.exchange.simulator.common.CommandWrapper;
+import com.xinchentechnote.exchange.simulator.common.Constant;
+import com.xinchentechnote.exchange.simulator.common.ExecType;
 import com.xinchentechnote.exchange.simulator.convertor.cmd.ApiCommandConvertorContext;
 import com.xinchentechnote.exchange.simulator.convertor.cmd.IApiCommandConverter;
 import com.xinchentechnote.exchange.simulator.sse.confirm.SseConfirmConvertor;
@@ -18,10 +21,11 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import lombok.Data;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 
 import java.util.List;
@@ -30,15 +34,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Data
-@Log4j2
+@Slf4j
 public class SseBinServer implements IEventsHandler {
 
     private ExchangeApi api;
     private int port;
 
-    private AtomicLong msgSeqNum = new AtomicLong(1);
-
-    private Map<Long, CommandWrapper> cache = new ConcurrentHashMap<>();
+    private final Map<Long, CommandWrapper> cache = new ConcurrentHashMap<>();
 
     public SseBinServer(int port) {
         this.port = port;
@@ -46,18 +48,21 @@ public class SseBinServer implements IEventsHandler {
 
     public void start() {
         ServerBootstrap bootstrap = new ServerBootstrap();
-        NioEventLoopGroup group = new NioEventLoopGroup(1);
-        NioEventLoopGroup workGroup = new NioEventLoopGroup(2);
+        EventLoopGroup group = new NioEventLoopGroup(1);
+        EventLoopGroup workGroup = new NioEventLoopGroup(2);
         bootstrap.group(group, workGroup)
                 .channel(NioServerSocketChannel.class)
                 .childHandler(new SseBinServerInitializer(this));
-        bootstrap.bind(port).addListener(future -> {
-            if (future.isSuccess()) {
-                log.info("SseBinServer started on port :{}", port);
-            } else {
-                log.error("Failed to start SseBinServer on port :{},{}", port, future.cause());
-            }
-        });
+        try {
+            // 绑定失败必须终止启动，否则问题会推迟到客户端连不上时才暴露
+            bootstrap.bind(port).sync();
+            log.info("SseBinServer started on port :{}", port);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Failed to start SseBinServer on port " + port, e);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to start SseBinServer on port " + port, e);
+        }
     }
 
     public void onMessage(SseBinary msg, Channel channel) {
@@ -80,26 +85,52 @@ public class SseBinServer implements IEventsHandler {
         api.submitCommandAsync(apiCommand);
     }
 
+    /**
+     * 连接断开：清理该会话全部委托缓存，释放 Channel 引用。
+     */
+    public void onChannelInactive(Channel channel) {
+        int removed = 0;
+        for (CommandWrapper wrapper : cache.values()) {
+            if (wrapper.getChannel() == channel && cache.remove(wrapper.getUniqueId()) != null) {
+                removed++;
+            }
+        }
+        if (removed > 0) {
+            log.info("Removed {} cached orders for closed channel {}", removed, channel.remoteAddress());
+        }
+    }
+
     @Override
     public void tradeEvent(TradeEvent tradeEvent) {
         log.info("Trade event: {}", tradeEvent);
         long takerOrderId = tradeEvent.getTakerOrderId();
         CommandWrapper commandWrapper = cache.get(takerOrderId);
-        SseTradeEventReportConvertor reportConvertor = new SseTradeEventReportConvertor();
-        Report report = reportConvertor.convert(tradeEvent, commandWrapper);
-        Channel channel = commandWrapper.getChannel();
-        sendReport(channel, report);
+        if (commandWrapper != null) {
+            SseTradeEventReportConvertor reportConvertor = new SseTradeEventReportConvertor();
+            Report report = reportConvertor.convert(tradeEvent, commandWrapper);
+            sendReport(commandWrapper.getChannel(), report);
+        } else {
+            log.warn("Taker order {} not found in cache, skip taker report", takerOrderId);
+        }
 
         List<Trade> trades = tradeEvent.getTrades();
         SseTradeReportConvertor sseTradeReportConvertor = new SseTradeReportConvertor();
         if (!CollectionUtils.isEmpty(trades)) {
             for (Trade trade : trades) {
                 CommandWrapper origin = cache.get(trade.getMakerOrderId());
+                if (origin == null) {
+                    log.warn("Maker order {} not found in cache, skip maker report", trade.getMakerOrderId());
+                    continue;
+                }
                 Report rep = sseTradeReportConvertor.convert(trade, origin);
                 sendReport(origin.getChannel(), rep);
             }
         }
 
+        if (tradeEvent.isTakeOrderCompleted()) {
+            //taker 全部成交，订单终态，移除缓存
+            cache.remove(takerOrderId);
+        }
     }
 
     private void sendReport(Channel channel, Report report) {
@@ -110,7 +141,7 @@ public class SseBinServer implements IEventsHandler {
         SseBinary sseBinary = new SseBinary();
         sseBinary.setMsgType(103);
         sseBinary.setBody(report);
-        sseBinary.setMsgSeqNum(msgSeqNum.getAndIncrement());
+        sseBinary.setMsgSeqNum(nextSeqNum(channel));
         log.info("Sending report: {}", report);
         ByteBuf buf = Unpooled.buffer();
         sseBinary.encode(buf);
@@ -119,7 +150,7 @@ public class SseBinServer implements IEventsHandler {
 
     @Override
     public void reduceEvent(ReduceEvent reduceEvent) {
-        //暂不处理
+        //撤单/减量，暂不处理
         log.info("Reduce event: {}", reduceEvent);
     }
 
@@ -146,6 +177,10 @@ public class SseBinServer implements IEventsHandler {
                     Confirm confirm = confirmConvertor.convert(orderSingle, commandResult);
                     if (confirm != null) {
                         sendConfirm(commandWrapper.getChannel(), confirm);
+                        if (ExecType.REJECTED.equals(confirm.getExecType())) {
+                            //申报被拒，订单终态，移除缓存
+                            cache.remove(orderId);
+                        }
                     }
                 }
             }
@@ -158,13 +193,26 @@ public class SseBinServer implements IEventsHandler {
             return;
         }
         SseBinary sseBinary = new SseBinary();
-        sseBinary.setMsgSeqNum(msgSeqNum.getAndIncrement());
+        sseBinary.setMsgSeqNum(nextSeqNum(channel));
         sseBinary.setMsgType(32);
         sseBinary.setBody(confirm);
         log.info("Sending confirm: {}", confirm);
         ByteBuf buf = Unpooled.buffer();
         sseBinary.encode(buf);
         channel.writeAndFlush(buf);
+    }
+
+    /**
+     * 下行报文序号按会话独立计数（协议要求会话内单调递增）。
+     */
+    private long nextSeqNum(Channel channel) {
+        AtomicLong seq = channel.attr(Constant.MSG_SEQ_NUM).get();
+        if (seq == null) {
+            AtomicLong created = new AtomicLong(1);
+            AtomicLong existing = channel.attr(Constant.MSG_SEQ_NUM).setIfAbsent(created);
+            seq = existing != null ? existing : created;
+        }
+        return seq.getAndIncrement();
     }
 
     @Override

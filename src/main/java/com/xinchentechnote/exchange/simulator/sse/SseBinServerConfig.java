@@ -12,7 +12,7 @@ import exchange.core2.core.common.api.ApiAdjustUserBalance;
 import exchange.core2.core.common.api.binary.BatchAddSymbolsCommand;
 import exchange.core2.core.common.config.ExchangeConfiguration;
 import lombok.Data;
-import org.springframework.beans.factory.InitializingBean;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -21,9 +21,10 @@ import org.springframework.context.annotation.Configuration;
 import java.util.List;
 
 @Data
+@Slf4j
 @Configuration
 @ConfigurationProperties(prefix = "sse.bin.server")
-public class SseBinServerConfig implements InitializingBean {
+public class SseBinServerConfig {
 
     private int port = 9010;
 
@@ -33,11 +34,6 @@ public class SseBinServerConfig implements InitializingBean {
     private SymbolInfoLoadService symbolInfoLoadService;
     @Autowired
     private AccountInfoLoadService accountInfoLoadService;
-
-    @Override
-    public void afterPropertiesSet() throws Exception {
-        System.out.println(this);
-    }
 
     @Bean
     public SseBinServer sseBinServer() {
@@ -53,6 +49,7 @@ public class SseBinServerConfig implements InitializingBean {
         //load symbol and account info
         List<ApiAdjustUserBalance> userBalances = accountInfoLoadService.loadData(sseBinMatcherConfig.getAccountInfoPath());
         List<CoreSymbolSpecification> coreSymbolSpecifications = symbolInfoLoadService.loadData(sseBinMatcherConfig.getSymbolInfoPath());
+        log.info("SSE market init: {} users, {} symbols", userBalances.stream().map(u -> u.uid).distinct().count(), coreSymbolSpecifications.size());
 
         userBalances.stream().map(u -> u.uid).distinct().forEach(uid -> {
             api.submitCommandAsync(ApiAddUser.builder().uid(uid).build());
@@ -60,7 +57,7 @@ public class SseBinServerConfig implements InitializingBean {
 
         api.submitBinaryDataAsync(new BatchAddSymbolsCommand(coreSymbolSpecifications));
 
-        userBalances.forEach(ub->{
+        userBalances.forEach(ub -> {
             ApiAdjustUserBalance build = ApiAdjustUserBalance.builder().uid(ub.uid).currency(ub.currency).amount(ub.amount).transactionId(GlobalUniqueId.getAndIncrement()).build();
             api.submitCommandAsync(build);
         });

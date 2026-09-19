@@ -36,25 +36,21 @@ public class ExchangeServiceImpl implements ExchangeService {
                 ? Long.parseLong(request.getOrderId())
                 : orderIdGenerator.incrementAndGet();
 
+        // reservePrice 可选，缺省回落到委托价（与二进制通道转换器行为一致）
+        long reservePrice = request.getReservePrice() != null
+                ? request.getReservePrice().longValue()
+                : request.getPrice().longValue();
+
         return ApiPlaceOrder.builder()
                 .orderId(orderId)
                 .uid(request.getUserId())
                 .price(request.getPrice().longValue())
                 .size(request.getSize().longValue())
-                .reservePrice(request.getReservePrice().longValue())
+                .reservePrice(reservePrice)
                 .action(request.getAction())
                 .orderType(request.getOrderType())
                 .symbol(request.getSymbol())
                 .userCookie(0)  // 用户自定义数据
                 .build();
-    }
-
-    /**
-     * 快速检查是否立即成交的方法
-     */
-    public boolean checkImmediateFill(ApiPlaceOrder placeOrder) {
-        // 这里可以实现快速成交检查逻辑
-        // 实际实现需要查询订单簿
-        return false;
     }
 }

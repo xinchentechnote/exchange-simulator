@@ -3,7 +3,6 @@ package com.xinchentechnote.exchange.simulator.szse;
 import com.xinchentechnote.exchange.simulator.GlobalUniqueId;
 import com.xinchentechnote.exchange.simulator.loaddata.AccountInfoLoadService;
 import com.xinchentechnote.exchange.simulator.loaddata.SymbolInfoLoadService;
-import com.xinchentechnote.exchange.simulator.sse.SseBinServer;
 import exchange.core2.core.ExchangeApi;
 import exchange.core2.core.ExchangeCore;
 import exchange.core2.core.SimpleEventsProcessor;
@@ -13,7 +12,7 @@ import exchange.core2.core.common.api.ApiAdjustUserBalance;
 import exchange.core2.core.common.api.binary.BatchAddSymbolsCommand;
 import exchange.core2.core.common.config.ExchangeConfiguration;
 import lombok.Data;
-import org.springframework.beans.factory.InitializingBean;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -22,9 +21,10 @@ import org.springframework.context.annotation.Configuration;
 import java.util.List;
 
 @Data
+@Slf4j
 @Configuration
 @ConfigurationProperties(prefix = "szse.bin.server")
-public class SzseBinServerConfig implements InitializingBean {
+public class SzseBinServerConfig {
 
     private int port = 9011;
 
@@ -35,13 +35,8 @@ public class SzseBinServerConfig implements InitializingBean {
     @Autowired
     private AccountInfoLoadService accountInfoLoadService;
 
-    @Override
-    public void afterPropertiesSet() throws Exception {
-        System.out.println(this);
-    }
-
     @Bean
-    public SzseBinServer szseBinServer(){
+    public SzseBinServer szseBinServer() {
         SzseBinServer szseBinServer = new SzseBinServer(port);
         ExchangeApi exchangeApi = creatExchangeApi(szseBinServer);
         szseBinServer.setApi(exchangeApi);
@@ -50,12 +45,11 @@ public class SzseBinServerConfig implements InitializingBean {
         return szseBinServer;
     }
 
-
-
     private void initBaseInfo(ExchangeApi api) {
         //load symbol and account info
         List<ApiAdjustUserBalance> userBalances = accountInfoLoadService.loadData(szseBinMatcherConfig.getAccountInfoPath());
         List<CoreSymbolSpecification> coreSymbolSpecifications = symbolInfoLoadService.loadData(szseBinMatcherConfig.getSymbolInfoPath());
+        log.info("SZSE market init: {} users, {} symbols", userBalances.stream().map(u -> u.uid).distinct().count(), coreSymbolSpecifications.size());
 
         userBalances.stream().map(u -> u.uid).distinct().forEach(uid -> {
             api.submitCommandAsync(ApiAddUser.builder().uid(uid).build());
@@ -63,7 +57,7 @@ public class SzseBinServerConfig implements InitializingBean {
 
         api.submitBinaryDataAsync(new BatchAddSymbolsCommand(coreSymbolSpecifications));
 
-        userBalances.forEach(ub->{
+        userBalances.forEach(ub -> {
             ApiAdjustUserBalance build = ApiAdjustUserBalance.builder().uid(ub.uid).currency(ub.currency).amount(ub.amount).transactionId(GlobalUniqueId.getAndIncrement()).build();
             api.submitCommandAsync(build);
         });

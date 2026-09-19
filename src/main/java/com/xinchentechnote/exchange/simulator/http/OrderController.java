@@ -1,11 +1,12 @@
 package com.xinchentechnote.exchange.simulator.http;
 
-import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import javax.validation.Valid;
 
 @Slf4j
 @RestController
@@ -17,12 +18,11 @@ public class OrderController {
     private ExchangeService exchangeService;
 
     /**
-     * 委托下单接口
-     * 如果订单能立即成交，则立即返回
-     * 否则等待最多3秒返回订单状态
+     * 委托下单接口：异步提交到撮合核心，立即返回是否受理成功。
+     * 订单的确认/成交情况由撮合核心事件回调输出到日志（同步等待订单状态的能力尚未实现）。
      *
      * @param request 订单请求
-     * @return 订单响应
+     * @return true=已受理提交，false=提交过程异常
      */
     @PostMapping("/place")
     public ResponseEntity<Boolean> placeOrder(@Valid @RequestBody OrderRequest request) {

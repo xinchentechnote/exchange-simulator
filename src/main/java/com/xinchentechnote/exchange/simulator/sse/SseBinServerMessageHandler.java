@@ -3,10 +3,9 @@ package com.xinchentechnote.exchange.simulator.sse;
 import com.finproto.sse.bin.messages.SseBinary;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.timeout.IdleStateEvent;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 
-@Log4j2
+@Slf4j
 public class SseBinServerMessageHandler extends SimpleChannelInboundHandler<SseBinary> {
 
     private final SseBinServer sseBinServer;
@@ -16,14 +15,10 @@ public class SseBinServerMessageHandler extends SimpleChannelInboundHandler<SseB
     }
 
     @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        log.info("New connection from " + ctx.channel().remoteAddress());
-        super.channelActive(ctx);
-    }
-
-    @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         log.info("Connection closed from " + ctx.channel().remoteAddress());
+        //连接断开，清理该会话全部委托缓存，避免 Channel 引用泄漏
+        sseBinServer.onChannelInactive(ctx.channel());
         super.channelInactive(ctx);
     }
 
@@ -39,6 +34,4 @@ public class SseBinServerMessageHandler extends SimpleChannelInboundHandler<SseB
             sseBinServer.onMessage(sseBinary, ctx.channel());
         }
     }
-
-
 }

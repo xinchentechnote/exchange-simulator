@@ -1,9 +1,10 @@
 package com.xinchentechnote.exchange.simulator.szse.confirm;
 
 import com.finproto.szse.bin.messages.ExecutionConfirm;
+import com.finproto.szse.bin.messages.Extend200102;
 import com.finproto.szse.bin.messages.NewOrder;
+import com.xinchentechnote.exchange.simulator.common.ExecType;
 import com.xinchentechnote.exchange.simulator.convertor.CommandResultConvertor;
-import com.xinchentechnote.exchange.simulator.sse.ExecType;
 import exchange.core2.core.IEventsHandler;
 
 public class SzseConfirmConvertor implements CommandResultConvertor<NewOrder, ExecutionConfirm> {
@@ -12,17 +13,17 @@ public class SzseConfirmConvertor implements CommandResultConvertor<NewOrder, Ex
         String execType;
         switch (commandResult.getResultCode()) {
             case SUCCESS:
-                execType = com.xinchentechnote.exchange.simulator.sse.ExecType.NEW;
+                execType = ExecType.NEW;
                 break;
             case RISK_NSF:
             case RISK_MARGIN_TRADING_DISABLED:
             case RISK_INVALID_RESERVE_BID_PRICE:
             case RISK_ASK_PRICE_LOWER_THAN_FEE:
             case USER_MGMT_USER_NOT_FOUND:
+            default:
+                //未映射的结果码一律按申报拒绝下发，保证客户端总能收到回执
                 execType = ExecType.REJECTED;
                 break;
-            default:
-                return null;
         }
         ExecutionConfirm confirm = new ExecutionConfirm();
         confirm.setAccountId(newOrder.getAccountId());
@@ -43,6 +44,7 @@ public class SzseConfirmConvertor implements CommandResultConvertor<NewOrder, Ex
         confirm.setLeavesQty(newOrder.getOrderQty());
         confirm.setOwnerType(newOrder.getOwnerType());
         confirm.setApplId(newOrder.getApplId());
+        confirm.setApplExtend(new Extend200102());
         return confirm;
     }
 }

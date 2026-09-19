@@ -55,16 +55,11 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- 参数校验（Boot 2.7 对应 javax.validation 系；勿混用 jakarta.validation） -->
         <dependency>
-            <groupId>jakarta.validation</groupId>
-            <artifactId>jakarta.validation-api</artifactId>
-            <version>3.0.2</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.hibernate.validator</groupId>
-            <artifactId>hibernate-validator</artifactId>
-            <version>8.0.0.Final</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+            <version>${spring-boot.version}</version>
         </dependency>
 
         <dependency>
@@ -105,6 +100,12 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <!-- JUnit 5 需要 2.22+ 的 surefire 才能被发现执行 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.22.2</version>
             </plugin>
         </plugins>
     </build>

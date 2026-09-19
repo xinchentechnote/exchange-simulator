@@ -1,11 +1,12 @@
 package com.xinchentechnote.exchange.simulator.szse.trade;
 
-import com.finproto.codec.BinaryCodec;
 import com.finproto.szse.bin.messages.ExecutionReport;
+import com.finproto.szse.bin.messages.Extend200115;
 import com.finproto.szse.bin.messages.NewOrder;
 import com.finproto.szse.bin.messages.SzseBinary;
+import com.xinchentechnote.exchange.simulator.common.CommandWrapper;
+import com.xinchentechnote.exchange.simulator.common.ExecType;
 import com.xinchentechnote.exchange.simulator.convertor.trade.IReportConvertor;
-import com.xinchentechnote.exchange.simulator.sse.CommandWrapper;
 import exchange.core2.core.IEventsHandler;
 
 public class SzseTradeReportConvertor implements IReportConvertor<IEventsHandler.Trade, ExecutionReport> {
@@ -13,14 +14,13 @@ public class SzseTradeReportConvertor implements IReportConvertor<IEventsHandler
     @Override
     public ExecutionReport convert(IEventsHandler.Trade trade, CommandWrapper requestWrapper) {
         SzseBinary originMsg = (SzseBinary) requestWrapper.getOriginMsg();
-        BinaryCodec body = originMsg.getBody();
         ExecutionReport report = new ExecutionReport();
-        if (body instanceof NewOrder) {
-            NewOrder orderSingle = (NewOrder) body;
+        if (originMsg.getBody() instanceof NewOrder) {
+            NewOrder orderSingle = (NewOrder) originMsg.getBody();
             report.setAccountId(orderSingle.getAccountId());
             report.setSecurityId(orderSingle.getSecurityId());
             report.setApplId(orderSingle.getApplId());
-            report.setExecType("F");
+            report.setExecType(ExecType.TRADE);
             report.setReportingPbuid(orderSingle.getSubmittingPbuid());
             report.setSubmittingPbuid(orderSingle.getSubmittingPbuid());
             report.setClOrdId(orderSingle.getClOrdId());
@@ -29,9 +29,10 @@ public class SzseTradeReportConvertor implements IReportConvertor<IEventsHandler
             report.setUserInfo(orderSingle.getUserInfo());
             report.setTransactTime(orderSingle.getTransactTime());
             report.setLeavesQty(orderSingle.getOrderQty());
-            report.setOrdStatus("0");
+            report.setOrdStatus(ExecType.NEW);
             report.setLastPx(trade.price);
             report.setLastQty(trade.volume);
+            report.setApplExtend(new Extend200115());
         }
         return report;
     }

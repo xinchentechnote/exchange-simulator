@@ -10,9 +10,15 @@ import exchange.core2.core.common.api.ApiAddUser;
 import exchange.core2.core.common.api.ApiAdjustUserBalance;
 import exchange.core2.core.common.api.binary.BatchAddSymbolsCommand;
 import exchange.core2.core.common.config.ExchangeConfiguration;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * HTTP 测试接口专用的演示撮合核心（与 SSE/SZSE 协议市场相互独立）。
+ * TODO(P1-12): 与协议市场打通或移除，见 docs/TODO.md。
+ */
+@Slf4j
 @Configuration
 public class ExchangeConfig {
 
@@ -22,27 +28,27 @@ public class ExchangeConfig {
         SimpleEventsProcessor eventsProcessor = new SimpleEventsProcessor(new IEventsHandler() {
             @Override
             public void tradeEvent(TradeEvent tradeEvent) {
-                System.out.println("Trade event: " + tradeEvent);
+                log.info("Trade event: {}", tradeEvent);
             }
 
             @Override
             public void reduceEvent(ReduceEvent reduceEvent) {
-                System.out.println("Reduce event: " + reduceEvent);
+                log.info("Reduce event: {}", reduceEvent);
             }
 
             @Override
             public void rejectEvent(RejectEvent rejectEvent) {
-                System.out.println("Reject event: " + rejectEvent);
+                log.info("Reject event: {}", rejectEvent);
             }
 
             @Override
             public void commandResult(ApiCommandResult commandResult) {
-                System.out.println("Command result: " + commandResult);
+                log.info("Command result: {}", commandResult);
             }
 
             @Override
             public void orderBook(OrderBook orderBook) {
-                System.out.println("OrderBook event: " + orderBook);
+                log.info("OrderBook event: {}", orderBook);
             }
         });
 
