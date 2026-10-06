@@ -519,9 +519,9 @@ docker run --rm -p 8080:8080 -p 9010:9010 -p 9011:9011 exchange-simulator
 - `testcase/sse/`：SSE 用例（`gw-auto-sse.toml` 连接 :9010，`sse_test_case.csv` 编排，`sse_{40,58,32,103}.csv` 为各 MsgType 的报文字段模板）。用例列为 `case_id, case_title, step_id, sleep_ms, step_desc, action_type(Send/Receive), verify_required(Y/N), test_tool, msg_type, test_data`。
 - `testcase/szse/`：SZSE 用例（`gw-auto-szse.toml` 连接 :9011，覆盖登录/下单/确认/成交/撤单成功/撤单拒绝，撤单成功回报按规范校验 ExecutionConfirm(200102)），字段模板列名与 fin-proto-go 的 json tag 一致；详见 `testcase/szse/readme.md`。
 
-> gt-auto v0.2.0 已知限制：其 SZSE codec 构造期望消息时仅对 NewOrder/ExecutionConfirm 预填 ApplExtend，
-> 而 Go 解码 ExecutionReport 必然生成非空 ApplExtend，导致 200115 回报的全字段对比误报。
-> 因此 SZSE 成交回报步骤 `verify_required=N`（字段断言由单元测试承担），修复 gt-auto 后可改回 Y。
+> gt-auto 版本要求（≥ v0.2.1）：SZSE codec 构造期望消息时需按 ApplID 预填 ExecutionReport.ApplExtend
+> （v0.2.0 仅覆盖 NewOrder/ExecutionConfirm，导致 200115 回报全字段对比 nil≠空结构误报；已修复于
+> gt-auto 仓库 `7a2ff6f`，tag 后即可用）。SZSE 成交回报步骤现已启用全字段校验。
 
 ---
 
@@ -536,6 +536,6 @@ docker run --rm -p 8080:8080 -p 9010:9010 -p 9011:9011 exchange-simulator
 5. 无持久化：重启后订单/成交/序列号全部丢失（模拟器可接受，但需在文档层面明确）；
 6. 无登录鉴权（Logon 不校验账号密码）——模拟器定位下可接受；
 7. HTTP 委托的回报仅记日志（无连接可下发，属设计内行为）；
-8. gt-auto v0.2.0 对 SZSE ExecutionReport 的 ApplExtend 对比缺陷（见 §6），待上游修复后恢复全字段校验。
+8. gt-auto 需 ≥ v0.2.1（ExecutionReport.ApplExtend 预填修复，已合入 gt-auto 仓库 `7a2ff6f`，待 tag 发布；CI/readme 已指向 v0.2.1）。
 
 已修复/实现项（撤单链路、逐笔成交回报与 OrdStatus 字典、HTTP 市场路由与同步确认、双市场公共骨架、心跳死代码、NPE、校验失效、fail-fast、缓存泄漏、按会话序号等）见 [TODO.md](./TODO.md) 的记录。

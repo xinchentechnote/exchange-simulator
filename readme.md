@@ -57,6 +57,7 @@ docker run --rm -p 8080:8080 -p 9010:9010 -p 9011:9011 exchange-simulator
 依赖 [gt-auto](https://github.com/xinchentechnote/gt-auto) 测试工具：
 
 ```shell
-go install github.com/xinchentechnote/gt-auto/cmd/gt-auto@v0.2.0
+# v0.2.1 起 SZSE 成交回报支持全字段校验（ApplExtend 预填修复）
+go install github.com/xinchentechnote/gt-auto/cmd/gt-auto@v0.2.1
 ./autotest.sh
 ```

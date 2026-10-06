@@ -12,11 +12,19 @@
 - 账户取自 `data/szse/account_data.csv`（20001-20010），证券取自 `data/szse/symbol_data.csv`（如 000001）
 - `ClearingFirm` 在 NewOrder 中为 **2 字符定长字段**（协议定义），超长会被截断
 - `TransactTime` 格式 `yyyymmddHHMMSS`；回报中的 TradeDate 等字段由服务端按此推导
+- 成交回报 `OrdStatus` 按 OrdStatus 字典取值：部分成交=1、全部成交=2（本用例场景为全部成交=2）
 
-## 已知校验限制（gt-auto v0.2.0）
+## gt-auto 版本要求（≥ v0.2.1）
 
-`ExecutionReport(200115)` 的 Receive 步骤 `verify_required=N`：gt-auto v0.2.0 的
-`BinarySzseMessageCodec.JSONToStruct` 仅对 NewOrder/ExecutionConfirm 预填 ApplExtend，
-而 Go 解码 ExecutionReport 时必然按 ApplId 生成非空 ApplExtend，导致 nil≠空结构误报。
-修复 gt-auto（在 JSONToStruct 的 switch 中补 ExecutionReport/CancelReject 分支）后，
-可将上述步骤改回 `Y` 以恢复全字段校验。200102 确认与 290008 撤单拒绝仍为全字段校验（Y）。
+`ExecutionReport(200115)` 的 Receive 步骤做全字段校验（`verify_required=Y`），依赖 gt-auto
+v0.2.1 的修复：SZSE codec 构造期望消息时按 ApplID 预填 `ExecutionReport.ApplExtend`
+（与解码端行为一致；v0.2.0 仅覆盖 NewOrder/ExecutionConfirm，导致 nil≠空结构误报）。
+
+安装修复版：
+
+```shell
+go install github.com/xinchentechnote/gt-auto/cmd/gt-auto@v0.2.1
+# 或从源码：cd ~/workspace/gt-auto && go install ./cmd/gt-auto
+```
+
+若使用 v0.2.0，需将本目录 `szse_test_case.csv` 中 200115 的 Receive 步骤改为 `verify_required=N`。

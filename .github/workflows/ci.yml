@@ -93,7 +93,8 @@ jobs:
 
       - name: 安装 gt-auto
         run: |
-          go install github.com/xinchentechnote/gt-auto/cmd/gt-auto@v0.2.0
+          # v0.2.1 起 SZSE 期望消息预填 ExecutionReport.ApplExtend（成交回报全字段校验依赖此修复）
+          go install github.com/xinchentechnote/gt-auto/cmd/gt-auto@v0.2.1
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: 协议回归（复用 local-test.sh e2e 阶段）

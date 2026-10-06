@@ -119,7 +119,7 @@
 
 ## 建议的后续处理顺序
 
-1. **gt-auto 上游修复**：SZSE codec 的 ApplExtend 预填白名单补 ExecutionReport/CancelReject 分支（见 `testcase/szse/readme.md`），发版后将 SZSE 成交回报步骤的 `verify_required` 改回 `Y`；
+1. **发布 gt-auto v0.2.1**：ApplExtend 预填修复已在 gt-auto 仓库本地提交（`7a2ff6f`，含回归测试），push + tag 后 CI/readme 指向的 `@v0.2.1` 即生效（SZSE 成交回报全字段校验已在本仓库启用）；
 2. **SSE 规范文本**：如取得上交所 Binary 规范，核对 SSE 成交回报 OrdStatus 语义与编号字段；
 3. P3 按需（行情/持久化/交易时段/北交所/可观测性）。
 
@@ -127,7 +127,7 @@
 
 - 2026-09-19：文档建立 + 第一轮修复（全部 P0、7 项 P1 缺陷、P2 工程问题，38 个测试）。
 - 2026-10-07：功能开发轮——撤单全链路（P1-8）、成交回报逐笔化与字段修正（P1-11）、HTTP 打通市场（P1-12）、HTTP 同步等待确认（P2-19），测试增至 53 个。
-- 2026-10-07：规范核对与抽象轮——SZSE gt-auto 回归用例（P2-20 收口）、回报字段对照深交所规范 Ver1.29 核对并修正（撤单成功→200102、OrdStatus 字典、撤单拒绝当前状态，P1-11 收口）、双市场模板化抽象（P2-16 收口）。
+- 2026-10-07：规范核对与抽象轮——SZSE gt-auto 回归用例（P2-20 收口）、回报字段对照深交所规范 Ver1.29 核对并修正（撤单成功→200102、OrdStatus 字典、撤单拒绝当前状态，P1-11 收口）、双市场模板化抽象（P2-16 收口）；修复 gt-auto SZSE codec 的 ExecutionReport.ApplExtend 预填缺失（gt-auto `7a2ff6f`，待 tag v0.2.1），SZSE 成交回报恢复全字段校验。
 
 ## 本地验证方式（修复后）
 
