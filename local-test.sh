@@ -13,6 +13,12 @@
 #   e2e  : boot 基础上执行 gt-auto SSE 协议回归（需要 PATH 或 ~/go/bin 下有 gt-auto）
 #
 # 依赖: bash、mvn、curl；boot/e2e 阶段另需 JDK 8，e2e 另需 gt-auto（见 readme）
+
+# 脚本使用了 bash 特性（数组/[[/dev/tcp]]），用 `sh` 启动时自动切换到 bash
+if [ -z "${BASH_VERSION:-}" ]; then
+    exec bash "$0" "$@"
+fi
+
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -22,10 +28,10 @@ if [[ -t 1 ]]; then
 else
     GREEN=''; YELLOW=''; RED=''; BOLD=''; NC=''
 fi
-info()    { echo -e "${GREEN}[PASS]${NC} $1"; }
-warn()    { echo -e "${YELLOW}[SKIP]${NC} $1"; }
-fail()    { echo -e "${RED}[FAIL]${NC} $1"; }
-step()    { echo -e "\n${BOLD}==== $1 ====${NC}"; }
+info()    { printf '%b\n' "${GREEN}[PASS]${NC} $1"; }
+warn()    { printf '%b\n' "${YELLOW}[SKIP]${NC} $1"; }
+fail()    { printf '%b\n' "${RED}[FAIL]${NC} $1"; }
+step()    { printf '\n%b\n' "${BOLD}==== $1 ====${NC}"; }
 
 APP_PID=""
 APP_LOG=""
@@ -34,7 +40,7 @@ FAILURES=0
 
 record() { # record <phase> <status> <message>
     RESULTS="${RESULTS}$1:$2  "
-    if [[ "$2" != "PASS" ]]; then FAILURES=$((FAILURES + 1)); fi
+    if [[ "$2" == "FAIL" ]]; then FAILURES=$((FAILURES + 1)); fi
 }
 
 cleanup() {
@@ -88,8 +94,13 @@ find_jdk8() {
     if [[ -n "${JAVA_HOME:-}" ]] && java8_ok "$JAVA_HOME/bin/java"; then
         echo "$JAVA_HOME/bin/java"; return 0
     fi
-    if [[ "$(uname)" == "Darwin" ]] && /usr/libexec/java_home -v 1.8 >/dev/null 2>&1; then
-        echo "$(/usr/libexec/java_home -v 1.8)/bin/java"; return 0
+    if [[ "$(uname)" == "Darwin" ]] && [[ -x /usr/libexec/java_home ]]; then
+        local jh
+        # 注意：macOS java_home -v 1.8 在未安装 JDK 8 时会"就近"返回更高版本的 JDK
+        # 且退出码为 0，因此返回结果必须再用 java8_ok 二次校验
+        if jh=$(/usr/libexec/java_home -v 1.8 2>/dev/null) && java8_ok "$jh/bin/java"; then
+            echo "$jh/bin/java"; return 0
+        fi
     fi
     local candidate
     for candidate in \
@@ -234,14 +245,26 @@ run_e2e() {
     if ! start_app "$java8"; then record e2e FAIL; return 1; fi
 
     local rc=0
-    if PATH="$(dirname "$gtauto"):$PATH" bash ./autotest.sh >"$APP_LOG.gtauto" 2>&1; then
+    # 看门狗：gt-auto 对异常端口可能长时间重试，限制最长执行时间（默认 600s）
+    ( PATH="$(dirname "$gtauto"):$PATH" bash ./autotest.sh ) >"$APP_LOG.gtauto" 2>&1 &
+    local gt_pid=$! waited=0
+    while kill -0 "$gt_pid" 2>/dev/null; do
+        sleep 5; waited=$((waited + 5))
+        if [[ $waited -ge ${E2E_TIMEOUT:-600} ]]; then
+            kill "$gt_pid" 2>/dev/null || true
+            fail "gt-auto 回归超时（${E2E_TIMEOUT}s），日志尾部:"; tail -20 "$APP_LOG.gtauto"; rc=1
+            break
+        fi
+    done
+    if [[ $rc -eq 0 ]]; then
+        wait "$gt_pid" || gt_rc=$?
         if grep -q '❌' "$APP_LOG.gtauto"; then
             fail "gt-auto 回归存在失败步骤（❌）:"; grep -n '❌' "$APP_LOG.gtauto" | head -10; rc=1
+        elif [[ "${gt_rc:-0}" -ne 0 ]]; then
+            fail "gt-auto 执行异常（退出码 $gt_rc），日志尾部:"; tail -20 "$APP_LOG.gtauto"; rc=1
         else
             info "gt-auto 回归全部通过（✅），明细: $APP_LOG.gtauto"
         fi
-    else
-        fail "gt-auto 执行异常（退出码非 0），日志尾部:"; tail -30 "$APP_LOG.gtauto"; rc=1
     fi
 
     if [[ $rc -eq 0 ]]; then record e2e PASS; else record e2e FAIL; fi
@@ -259,9 +282,9 @@ for phase in "${PHASES[@]}"; do
 done
 
 step "结果汇总"
-echo -e "${BOLD}${RESULTS}${NC}"
+printf '%b\n' "${BOLD}${RESULTS}${NC}"
 if [[ $FAILURES -gt 0 ]]; then
     fail "共 ${FAILURES} 个阶段未通过"
     exit 1
 fi
-echo -e "${GREEN}全部执行的阶段通过（被跳过的阶段标记为 SKIP）${NC}"
+printf '%b\n' "${GREEN}全部执行的阶段通过（被跳过的阶段标记为 SKIP）${NC}"

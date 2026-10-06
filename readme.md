@@ -34,10 +34,13 @@ docker run --rm -p 8080:8080 -p 9010:9010 -p 9011:9011 exchange-simulator
 
 ```shell
 ./local-test.sh            # 全部阶段：unit(编译+单测+打包) → boot(JDK8启动冒烟) → e2e(gt-auto协议回归)
-./local-test.sh unit boot  # 只跑指定阶段；JDK8 可用 JAVA8_HOME 或 --jdk8 指定
+./local-test.sh unit boot  # 只跑指定阶段
 ```
 
-无 JDK 8 / gt-auto 时对应阶段自动跳过（SKIP），不影响其他阶段。
+- JDK 8 自动探测顺序：`--jdk8` 参数 > `JAVA8_HOME` > `JAVA_HOME` > macOS `java_home -v 1.8`（结果会做版本校验）> 常见安装目录。
+  本机安装 JDK 8 推荐放入 `~/Library/Java/JavaVirtualMachines/`（Zulu 等 tar.gz 解压即可被 `java_home` 识别）。
+- 无 JDK 8 / gt-auto 时对应阶段自动跳过（SKIP），不影响其他阶段；SKIP 不计入失败。
+- e2e 阶段有 10 分钟看门狗（`E2E_TIMEOUT` 可调），gt-auto 异常时不会无限等待。
 
 ## CI
 
