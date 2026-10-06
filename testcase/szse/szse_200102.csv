@@ -1,0 +1,5 @@
+StepId,ApplID,ReportingPBUID,SubmittingPBUID,SecurityID,OwnerType,ClearingFirm,TransactTime,UserInfo,ClOrdID,ExecType,OrdStatus,LeavesQty,CumQty,Side,OrdType,OrderQty,Price,AccountID,BranchID
+confirm_001,010,pbu001,pbu001,000001,1,10,20250106101530,u001,c001,0,0,100,0,1,1,100,10,20001,b001
+confirm_002,010,pbu002,pbu002,000001,1,20,20250106101605,u002,c002,0,0,100,0,2,1,100,10,20002,b002
+confirm_003,010,pbu001,pbu001,000001,1,10,20250106101700,u001,c003,0,0,100,0,1,1,100,11,20001,b001
+cancel_confirm_001,010,pbu001,pbu001,000001,1,10,20250106101700,u001,c003,4,4,0,0,1,1,100,11,20001,b001

@@ -119,7 +119,8 @@ flowchart TB
 5. **内部订单号全局自增**：`GlobalUniqueId`（AtomicLong 从 1 开始）同时用于 orderId 与资金调整的 transactionId；SSE 委托的 `securityId`（如 600000）直接映射为 exchange-core 的 `symbolId`，`account` 映射为 `uid`。
 6. **下行消息序号按会话独立**：SSE 下行 MsgSeqNum 存于 channel attr（`Constant.MSG_SEQ_NUM`），每个会话内单调递增、互不影响。
 7. **成交回报逐笔生成**：`tradeEvent` 遍历成交明细（trades），每笔成交分别向 taker 与 maker 发一份回报，`LastPx`/`LastQty` 取实际成交价量；`CommandWrapper.cumQty` 累计已成交量，`LeavesQty = 委托量 - CumQty`（SZSE 另填 CumQty 字段；SSE Report 无该字段）。
-8. **撤单链路**：撤单请求（SSE `ORDER_CANCEL(61)` / SZSE `OrderCancelRequest(190007)`）按 `origClOrdId` 反查原订单 → 组装 `ApiCancelOrder`（orderId/uid/symbol 取自原委托）提交；撮合返回 SUCCESS 下发撤单确认（Report/ExecutionReport，ExecType=4、LeavesQty=0、OrdStatus=4），失败下发撤单拒绝（SSE `CANCEL_REJECT(59)` 带 CxlRejReason / SZSE `CancelReject(290008)` 带 RejectText），失败后原订单保留。
+8. **撤单链路**：撤单请求（SSE `ORDER_CANCEL(61)` / SZSE `OrderCancelRequest(190007)`）按 `origClOrdId` 反查原订单 → 组装 `ApiCancelOrder`（orderId/uid/symbol 取自原委托）提交；撮合返回 SUCCESS 下发撤单确认（SSE: Report(103) ExecType=4；SZSE: **ExecutionConfirm(200102)**，ExecType=4、OrdStatus=4、CumQty=已成交量、LeavesQty=0，依据深交所规范 Ver1.29 §7.1 撤单成功回报为 20xx02），失败下发撤单拒绝（SSE `CANCEL_REJECT(59)` 带 CxlRejReason / SZSE `CancelReject(290008)` 带 RejectText，**OrdStatus 填目标委托当前状态**），失败后原订单保留。
+9. **双市场公共骨架**：`common.AbstractBinServer` 实现委托缓存/ClOrdId 索引/HTTP 网关/撤单与回报调度（模板方法），`common.AbstractBinConnectionHandler<M>` 实现登录校验/心跳三振/回显骨架；市场差异（编解码、确认/回报/拒绝报文组装）下沉到 SSE/SZSE 子类，新增市场只需实现 5 个协议钩子 + 管线。
 
 ### 2.3 线程模型
 
@@ -324,7 +325,7 @@ classDiagram
 | 事件 | SSE 处理 | SZSE 处理 |
 | --- | --- | --- |
 | commandResult（ApiPlaceOrder） | Confirm(32) 下发；被拒则清理缓存并完成 HTTP 等待 | ExecutionConfirm(200102) 同左 |
-| commandResult（ApiCancelOrder） | SUCCESS → Report(103, ExecType=4) + 清理；失败 → CancelReject(59)，订单保留 | 同左（ExecutionReport / CancelReject(290008)） |
+| commandResult（ApiCancelOrder） | SUCCESS → Report(103, ExecType=4) + 清理；失败 → CancelReject(59)，订单保留 | SUCCESS → **ExecutionConfirm(200102)**（ExecType=4/OrdStatus=4/CumQty/LeavesQty=0）+ 清理；失败 → CancelReject(290008)（OrdStatus=委托当前状态），订单保留 |
 | tradeEvent | 逐笔回报（taker + maker 各一份/每笔），LastPx=成交价，LeavesQty 扣减 | 同左（ExecutionReport，另填 CumQty） |
 | rejectEvent | 仅日志 | 仅日志 |
 | reduceEvent | 仅日志 | 仅日志 |
@@ -509,30 +510,32 @@ java -jar target/exchange-simulator-1.0-SNAPSHOT.jar
 docker build -t exchange-simulator .
 docker run --rm -p 8080:8080 -p 9010:9010 -p 9011:9011 exchange-simulator
 
-# SSE 自动化回归（依赖 gt-auto 工具，见 readme；应用启动后执行）
+# 协议自动化回归（SSE + SZSE 双市场，依赖 gt-auto 工具；应用启动后执行）
 ./autotest.sh
 ```
 
-自动化测试用例（`testcase/sse/`）：
+自动化测试用例：
 
-- `gw-auto-sse.toml`：gt-auto 模拟器配置（oms 类型，连接 localhost:9010，binary-sse 协议）；
-- `sse_test_case.csv`：用例编排，列为 `case_id, case_title, step_id, sleep_ms, step_desc, action_type(Send/Receive), verify_required(Y/N), test_tool, msg_type, test_data`；
-- `sse_{40,58,32,103}.csv`：各 MsgType 的报文字段模板（gt-auto 参数化填充）。
+- `testcase/sse/`：SSE 用例（`gw-auto-sse.toml` 连接 :9010，`sse_test_case.csv` 编排，`sse_{40,58,32,103}.csv` 为各 MsgType 的报文字段模板）。用例列为 `case_id, case_title, step_id, sleep_ms, step_desc, action_type(Send/Receive), verify_required(Y/N), test_tool, msg_type, test_data`。
+- `testcase/szse/`：SZSE 用例（`gw-auto-szse.toml` 连接 :9011，覆盖登录/下单/确认/成交/撤单成功/撤单拒绝，撤单成功回报按规范校验 ExecutionConfirm(200102)），字段模板列名与 fin-proto-go 的 json tag 一致；详见 `testcase/szse/readme.md`。
 
-> 目前仅有 SSE 用例，SZSE 用例与断言覆盖待补充（TODO P2-21）。
+> gt-auto v0.2.0 已知限制：其 SZSE codec 构造期望消息时仅对 NewOrder/ExecutionConfirm 预填 ApplExtend，
+> 而 Go 解码 ExecutionReport 必然生成非空 ApplExtend，导致 200115 回报的全字段对比误报。
+> 因此 SZSE 成交回报步骤 `verify_required=N`（字段断言由单元测试承担），修复 gt-auto 后可改回 Y。
 
 ---
 
 ## 7. 已知问题与限制（摘要）
 
-详细清单及代码位置见 [TODO.md](./TODO.md)。两轮修复/开发后仍开放的问题：
+详细清单及代码位置见 [TODO.md](./TODO.md)。三轮修复/开发后仍开放的问题：
 
 1. **运行时仅支持 JDK 8**（chronicle 依赖无升级路径，已通过 Dockerfile/文档固化；CI 待跟进）；
-2. 成交回报部分字段仍需对照正式协议规范确认（ordStatus 在成交回报中恒为 "0" 与 gt-auto 基准一致但语义存疑；手续费/成交编号等字段未填）；
-3. maker 单部分成交期间缓存保留至断连（无终态信号，可接受残余）；
-4. 无持久化：重启后订单/成交/序列号全部丢失（模拟器可接受，但需在文档层面明确）；
-5. 无登录鉴权（Logon 不校验账号密码）——模拟器定位下可接受；
-6. SZSE 协议回归用例待补充（gt-auto testcase 仅有 SSE）；
-7. HTTP 委托的回报仅记日志（无连接可下发，属设计内行为）。
+2. 成交回报编号类字段（SZSE OrderID/ExecID、SSE TrdCnfmID/OrdCnfmID）与手续费字段留空：手续费在两协议回报中不存在；编号属交易所分配语义，填内部自增值会让 OMS 测试依赖伪编号且不可预测（核对结论，见 TODO P1-11）；
+3. SSE 成交回报 OrdStatus 恒 "0"：无上交所规范文本，以 gt-auto SSE 基准数据为准；SZSE 已按规范区分 部分成交=1/全部成交=2；
+4. maker 单部分成交期间缓存保留至断连（无终态信号，可接受残余）；
+5. 无持久化：重启后订单/成交/序列号全部丢失（模拟器可接受，但需在文档层面明确）；
+6. 无登录鉴权（Logon 不校验账号密码）——模拟器定位下可接受；
+7. HTTP 委托的回报仅记日志（无连接可下发，属设计内行为）；
+8. gt-auto v0.2.0 对 SZSE ExecutionReport 的 ApplExtend 对比缺陷（见 §6），待上游修复后恢复全字段校验。
 
-已修复/实现项（撤单链路、逐笔成交回报、HTTP 市场路由与同步确认、心跳死代码、NPE、校验失效、fail-fast、缓存泄漏、按会话序号等）见 [TODO.md](./TODO.md) 的记录。
+已修复/实现项（撤单链路、逐笔成交回报与 OrdStatus 字典、HTTP 市场路由与同步确认、双市场公共骨架、心跳死代码、NPE、校验失效、fail-fast、缓存泄漏、按会话序号等）见 [TODO.md](./TODO.md) 的记录。

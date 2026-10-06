@@ -1,0 +1,15 @@
+case_id,case_title,step_id,sleep_ms,step_desc,action_type,verify_required,test_tool,msg_type,test_data
+szse_001,logon,logon_001,1000,szse oms send logon,Send,N,szse_bin_oms_1,1,szse_1
+szse_001,logon,logon_002,1000,szse oms rev logon,Receive,Y,szse_bin_oms_1,1,szse_1
+szse_001,order,new_order_001,1000,szse oms send new order,Send,N,szse_bin_oms_1,100101,szse_100101
+szse_001,order,new_order_002,1000,szse oms send new order,Send,N,szse_bin_oms_1,100101,szse_100101
+szse_001,confirm,confirm_001,1000,szse oms rev confirm,Receive,Y,szse_bin_oms_1,200102,szse_200102
+szse_001,confirm,confirm_002,1000,szse oms rev confirm,Receive,Y,szse_bin_oms_1,200102,szse_200102
+szse_001,report,report_001,1000,szse oms rev trade report,Receive,N,szse_bin_oms_1,200115,szse_200115
+szse_001,report,report_002,1000,szse oms rev trade report,Receive,N,szse_bin_oms_1,200115,szse_200115
+szse_002,cancel,new_order_003,1000,szse oms send new order for cancel,Send,N,szse_bin_oms_1,100101,szse_100101
+szse_002,cancel,confirm_003,1000,szse oms rev confirm,Receive,Y,szse_bin_oms_1,200102,szse_200102
+szse_002,cancel,cancel_001,1000,szse oms send cancel,Send,N,szse_bin_oms_1,190007,szse_190007
+szse_002,cancel,cancel_confirm_001,1000,szse oms rev cancel confirm,Receive,Y,szse_bin_oms_1,200102,szse_200102
+szse_003,cancel_reject,cancel_002,1000,szse oms send cancel unknown order,Send,N,szse_bin_oms_1,190007,szse_190007
+szse_003,cancel_reject,cancel_reject_001,1000,szse oms rev cancel reject,Receive,Y,szse_bin_oms_1,290008,szse_290008

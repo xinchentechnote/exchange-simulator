@@ -67,7 +67,7 @@ jobs:
         run: JAVA8_HOME="$JAVA_HOME" ./local-test.sh boot
 
   protocol-e2e:
-    name: SSE 协议端到端回归 (gt-auto)
+    name: 协议端到端回归 (gt-auto SSE+SZSE)
     runs-on: ubuntu-latest
     needs: build-test
     steps:

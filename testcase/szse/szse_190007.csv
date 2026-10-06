@@ -1,0 +1,3 @@
+StepId,ApplID,SubmittingPBUID,SecurityID,TransactTime,UserInfo,ClOrdID,OrigClOrdID,Side,OrderID,OrderQty
+cancel_001,010,pbu001,000001,20250106101800,u001,cx1,c003,1,order-1,100
+cancel_002,010,pbu001,000001,20250106101900,u001,cx2,NOT-EXIST,1,order-2,100

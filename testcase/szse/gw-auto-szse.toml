@@ -1,0 +1,8 @@
+# SZSE 协议端到端回归：模拟器为 exchange-simulator (:9011)
+[[simulators]]
+name = "szse_bin_oms_1"
+type = "oms"
+communication = "tcp"
+protocol = "binary-szse"
+server_address = "localhost:9011"
+auto_start = false

@@ -104,7 +104,7 @@ class SzseCancelTest {
     }
 
     @Test
-    void cancelSuccessShouldSendCanceledReportAndEvict() {
+    void cancelSuccessShouldSendCanceledConfirmAndEvict() {
         placeOrder("CL-1");
         sendCancel("CX-1", "CL-1");
 
@@ -114,12 +114,14 @@ class SzseCancelTest {
 
         server.commandResult(new IEventsHandler.ApiCommandResult(cancelCmd, CommandResultCode.SUCCESS, 2L));
 
+        //按 SZSE 规范 §7.1，撤单成功回报为 ExecutionConfirm(20xx02) 而非 ExecutionReport
         SzseBinary out = readOutbound();
-        assertEquals(SzseMsgType.EXECUTION_REPORT, out.getMsgType());
-        ExecutionReport report = (ExecutionReport) out.getBody();
-        assertEquals(ExecType.CANCELED, report.getExecType());
-        assertEquals(ExecType.CANCELED, report.getOrdStatus());
-        assertEquals(0, report.getLeavesQty());
+        assertEquals(SzseMsgType.EXECUTION_CONFIRM, out.getMsgType());
+        com.finproto.szse.bin.messages.ExecutionConfirm confirm =
+                (com.finproto.szse.bin.messages.ExecutionConfirm) out.getBody();
+        assertEquals(ExecType.CANCELED, confirm.getExecType());
+        assertEquals(ExecType.CANCELED, confirm.getOrdStatus());
+        assertEquals(0, confirm.getLeavesQty());
         assertEquals(0, server.getCache().size());
         channel.finishAndReleaseAll();
     }

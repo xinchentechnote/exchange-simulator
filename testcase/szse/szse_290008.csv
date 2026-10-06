@@ -1,0 +1,2 @@
+StepId,ApplID,ReportingPBUID,SubmittingPBUID,SecurityID,TransactTime,UserInfo,ClOrdID,OrigClOrdID,Side,OrdStatus,RejectText
+cancel_reject_001,010,pbu001,pbu001,000001,20250106101900,u001,cx2,NOT-EXIST,1,0,unknown order

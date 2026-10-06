@@ -1,0 +1,3 @@
+StepId,SenderCompID,TargetCompID,HeartBtint,Password,DefaultApplVerID
+logon_001,szse_oms,szse_sim,10,,SZSE.V1
+logon_002,szse_oms,szse_sim,10,,SZSE.V1
