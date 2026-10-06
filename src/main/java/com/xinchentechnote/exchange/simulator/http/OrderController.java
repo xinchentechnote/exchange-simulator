@@ -18,26 +18,26 @@ public class OrderController {
     private ExchangeService exchangeService;
 
     /**
-     * 委托下单接口：异步提交到撮合核心，立即返回是否受理成功。
-     * 订单的确认/成交情况由撮合核心事件回调输出到日志（同步等待订单状态的能力尚未实现）。
+     * 委托下单接口。
+     * market 指定目标市场（sse/szse，缺省 sse）；waitTimeoutMs>0 时同步等待撮合确认，
+     * 否则异步受理立即返回（pending=true）。订单须使用目标市场 data/*.csv 中存在的账户与证券。
      *
      * @param request 订单请求
-     * @return true=已受理提交，false=提交过程异常
+     * @return 订单受理/确认结果
      */
     @PostMapping("/place")
-    public ResponseEntity<Boolean> placeOrder(@Valid @RequestBody OrderRequest request) {
+    public ResponseEntity<OrderResponse> placeOrder(@Valid @RequestBody OrderRequest request) {
         log.info("收到委托请求: {}", request);
 
         try {
-            boolean response = exchangeService.submitOrder(request);
-
-            log.info("委托处理完成: orderId={}, success={}", request.getOrderId(), response);
-
+            OrderResponse response = exchangeService.submitOrder(request);
+            log.info("委托处理完成: orderId={}, success={}, pending={}",
+                    request.getOrderId(), response.isSuccess(), response.isPending());
             return ResponseEntity.ok(response);
-
         } catch (Exception e) {
             log.error("委托处理异常: orderId={}", request.getOrderId(), e);
-            return ResponseEntity.ok(false);
+            return ResponseEntity.ok(OrderResponse.failed(request,
+                    request.getMarket(), "提交异常: " + e.getMessage()));
         }
     }
 

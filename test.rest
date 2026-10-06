@@ -1,29 +1,37 @@
-### 1001买入
+# 本地手工测试（VS Code REST Client / IDEA HTTP Client）
+# 撮合数据来自 data/{sse,szse}/*.csv：SSE 账户 10001-10010、SZSE 账户 20001-20010
+
+### SSE 买入（异步受理，立即返回 pending=true）
 POST http://localhost:8080/api/v1/orders/place
 Content-Type: application/json
 
 {
     "orderId": "10002",
-    "userId": 1001,
+    "market": "sse",
+    "userId": 10001,
     "action": "BID",
-    "reservePrice":50.0,
+    "reservePrice": 50.0,
     "orderType": "GTC",
     "price": 50.0,
     "size": 3,
-    "symbol": 10086
+    "symbol": 600000
 }
 
-### 1002卖出
+### SZSE 卖出（同步等待撮合确认，execType: 0=受理 8=拒绝）
 POST http://localhost:8080/api/v1/orders/place
 Content-Type: application/json
 
 {
-    "orderId": "10017",
-    "userId": 1002,
+    "orderId": "20002",
+    "market": "szse",
+    "userId": 20001,
     "action": "ASK",
-    "reservePrice":50.0,
     "orderType": "GTC",
-    "price": 50.0,
-    "size": 20,
-    "symbol": 10086
+    "price": 12.5,
+    "size": 10,
+    "symbol": 1,
+    "waitTimeoutMs": 3000
 }
+
+### 健康检查
+GET http://localhost:8080/api/v1/orders/health

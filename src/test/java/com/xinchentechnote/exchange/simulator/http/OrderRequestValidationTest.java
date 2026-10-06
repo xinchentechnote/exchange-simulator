@@ -29,8 +29,14 @@ class OrderRequestValidationTest {
     }
 
     private OrderRequest valid() {
-        return new OrderRequest("10001", 1001L, OrderAction.BID, OrderType.GTC,
-                new BigDecimal("50.0"), new BigDecimal("3"), 10086, new BigDecimal("50.0"));
+        return new OrderRequest("10001", "sse", 1001L, OrderAction.BID, OrderType.GTC,
+                new BigDecimal("50.0"), new BigDecimal("3"), 600000, new BigDecimal("50.0"), null);
+    }
+
+    private OrderRequest withOrderId(OrderRequest base, String orderId) {
+        return new OrderRequest(orderId, base.getMarket(), base.getUserId(), base.getAction(),
+                base.getOrderType(), base.getPrice(), base.getSize(), base.getSymbol(),
+                base.getReservePrice(), base.getWaitTimeoutMs());
     }
 
     private Set<ConstraintViolation<OrderRequest>> validate(OrderRequest request) {
@@ -44,41 +50,58 @@ class OrderRequestValidationTest {
 
     @Test
     void blankOrderIdShouldBeRejected() {
-        OrderRequest request = valid();
-        OrderRequest blank = new OrderRequest("", request.getUserId(), request.getAction(),
-                request.getOrderType(), request.getPrice(), request.getSize(), request.getSymbol(), request.getReservePrice());
-        assertTrue(validate(blank).stream().anyMatch(v -> "orderId".equals(v.getPropertyPath().toString())));
+        OrderRequest bad = withOrderId(valid(), "");
+        assertTrue(validate(bad).stream().anyMatch(v -> "orderId".equals(v.getPropertyPath().toString())));
     }
 
     @Test
     void nonNumericOrderIdShouldBeRejected() {
-        OrderRequest request = valid();
-        OrderRequest bad = new OrderRequest("abc", request.getUserId(), request.getAction(),
-                request.getOrderType(), request.getPrice(), request.getSize(), request.getSymbol(), request.getReservePrice());
+        OrderRequest bad = withOrderId(valid(), "abc");
         assertTrue(validate(bad).stream().anyMatch(v -> "orderId".equals(v.getPropertyPath().toString())));
     }
 
     @Test
     void nullPriceShouldBeRejected() {
-        OrderRequest request = valid();
-        OrderRequest bad = new OrderRequest(request.getOrderId(), request.getUserId(), request.getAction(),
-                request.getOrderType(), null, request.getSize(), request.getSymbol(), request.getReservePrice());
+        OrderRequest base = valid();
+        OrderRequest bad = new OrderRequest(base.getOrderId(), base.getMarket(), base.getUserId(), base.getAction(),
+                base.getOrderType(), null, base.getSize(), base.getSymbol(),
+                base.getReservePrice(), base.getWaitTimeoutMs());
         assertTrue(validate(bad).stream().anyMatch(v -> "price".equals(v.getPropertyPath().toString())));
     }
 
     @Test
     void zeroPriceShouldBeRejected() {
-        OrderRequest request = valid();
-        OrderRequest bad = new OrderRequest(request.getOrderId(), request.getUserId(), request.getAction(),
-                request.getOrderType(), BigDecimal.ZERO, request.getSize(), request.getSymbol(), request.getReservePrice());
+        OrderRequest base = valid();
+        OrderRequest bad = new OrderRequest(base.getOrderId(), base.getMarket(), base.getUserId(), base.getAction(),
+                base.getOrderType(), BigDecimal.ZERO, base.getSize(), base.getSymbol(),
+                base.getReservePrice(), base.getWaitTimeoutMs());
         assertTrue(validate(bad).stream().anyMatch(v -> "price".equals(v.getPropertyPath().toString())));
     }
 
     @Test
     void missingReservePriceShouldBeAllowed() {
-        OrderRequest request = valid();
-        OrderRequest noReserve = new OrderRequest(request.getOrderId(), request.getUserId(), request.getAction(),
-                request.getOrderType(), request.getPrice(), request.getSize(), request.getSymbol(), null);
+        OrderRequest base = valid();
+        OrderRequest noReserve = new OrderRequest(base.getOrderId(), base.getMarket(), base.getUserId(), base.getAction(),
+                base.getOrderType(), base.getPrice(), base.getSize(), base.getSymbol(),
+                null, base.getWaitTimeoutMs());
         assertTrue(validate(noReserve).isEmpty(), "reservePrice is optional");
+    }
+
+    @Test
+    void invalidMarketShouldBeRejected() {
+        OrderRequest base = valid();
+        OrderRequest bad = new OrderRequest(base.getOrderId(), "sh", base.getUserId(), base.getAction(),
+                base.getOrderType(), base.getPrice(), base.getSize(), base.getSymbol(),
+                base.getReservePrice(), base.getWaitTimeoutMs());
+        assertTrue(validate(bad).stream().anyMatch(v -> "market".equals(v.getPropertyPath().toString())));
+    }
+
+    @Test
+    void negativeWaitTimeoutShouldBeRejected() {
+        OrderRequest base = valid();
+        OrderRequest bad = new OrderRequest(base.getOrderId(), base.getMarket(), base.getUserId(), base.getAction(),
+                base.getOrderType(), base.getPrice(), base.getSize(), base.getSymbol(),
+                base.getReservePrice(), -1L);
+        assertTrue(validate(bad).stream().anyMatch(v -> "waitTimeoutMs".equals(v.getPropertyPath().toString())));
     }
 }

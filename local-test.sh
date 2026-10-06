@@ -197,19 +197,28 @@ run_boot() {
         -X POST "http://localhost:${HTTP_PORT}/api/v1/orders/place" \
         -H 'Content-Type: application/json' \
         -d '{"orderId":"abc","userId":1001,"action":"BID","orderType":"GTC","price":50.0,"size":3,"symbol":10086}')" || rc=1
-    # 4. 合法委托且缺省 reservePrice 应回落成功（200/true）
+    # 4. 合法委托且缺省 reservePrice 应回落成功（JSON success=true，HTTP 200）
     local body code
     code=$(curl -s -o /tmp/.local-test-body -w '%{http_code}' \
         -X POST "http://localhost:${HTTP_PORT}/api/v1/orders/place" \
         -H 'Content-Type: application/json' \
-        -d '{"orderId":"90001","userId":1001,"action":"BID","orderType":"GTC","price":50.0,"size":3,"symbol":10086}')
+        -d '{"orderId":"90001","market":"sse","userId":10001,"action":"BID","orderType":"GTC","price":50.0,"size":3,"symbol":600000}')
     body=$(cat /tmp/.local-test-body 2>/dev/null || true)
-    if [[ "$code" == "200" && "$body" == "true" ]]; then
-        info "合法委托受理成功且 reservePrice 缺省回落 (HTTP 200, body=true)"
+    if [[ "$code" == "200" && "$body" == *'"success":true'* ]]; then
+        info "合法委托受理成功且 reservePrice 缺省回落 (HTTP 200, success=true)"
     else
-        fail "合法委托: 期望 HTTP 200/true, 实际 $code/$body"; rc=1
+        fail "合法委托: 期望 HTTP 200 且 success=true, 实际 $code/$body"; rc=1
     fi
     rm -f /tmp/.local-test-body
+    # 5. 同步等待确认模式（waitTimeoutMs>0，账户充足应返回 execType=0）
+    body=$(curl -s -X POST "http://localhost:${HTTP_PORT}/api/v1/orders/place" \
+        -H 'Content-Type: application/json' \
+        -d '{"orderId":"90002","market":"sse","userId":10003,"action":"BID","orderType":"GTC","price":1.0,"size":1,"symbol":600000,"waitTimeoutMs":3000}')
+    if [[ "$body" == *'"pending":false'* && "$body" == *'"execType":"0"'* ]]; then
+        info "同步等待委托确认返回 execType=0"
+    else
+        fail "同步等待确认: 期望 pending=false execType=0, 实际 $body"; rc=1
+    fi
     # 5. 两个协议端口就绪
     grep -q "SseBinServer started on port :9010" "$APP_LOG" \
         && info "SSE 协议服务就绪 (:9010)" || { fail "SSE 协议服务未就绪"; rc=1; }

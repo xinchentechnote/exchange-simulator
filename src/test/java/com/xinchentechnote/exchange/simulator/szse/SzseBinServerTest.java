@@ -112,7 +112,8 @@ class SzseBinServerTest {
                 Collections.emptyList());
         server.tradeEvent(event);
 
-        assertNotNull(readOutbound(channel));
+        //逐笔回报语义：无成交明细则无回报，但终态清理照常执行
+        assertNull(channel.readOutbound());
         assertNull(server.getCache().get(1L), "completed taker should be removed from cache");
         channel.finishAndReleaseAll();
     }

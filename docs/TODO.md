@@ -48,8 +48,9 @@
   maker 单的部分成交残留（无终态信号）仍会保留到断连，属可接受残余。
   回归测试：`SseBinServerTest.rejectedCommandResultShouldSendRejectAndEvictCache` / `channelInactiveShouldEvictSessionOrders` 等。
 
-- [ ] **P1-8 撤单全链路未实现** ⬜（功能开发，未启动）
-  SSE `ORDER_CANCEL(61)`、SZSE `OrderCancelRequest` 转换器 → ApiCancelOrder → 撤单确认（ExecType=4）→ CancelReject。
+- [x] **P1-8 撤单全链路未实现** ✅（2026-10 功能开发轮实现）
+  撤单请求（SSE `ORDER_CANCEL(61)` / SZSE `OrderCancelRequest(190007)`）按 `origClOrdId` 反查原订单（`clOrdIdIndex`）→ 组装 `ApiCancelOrder`（orderId/uid/symbol 取自原委托）提交撮合核心；SUCCESS → 撤单确认（Report/ExecutionReport，ExecType=4、OrdStatus=4、LeavesQty=0）并清理缓存与索引；失败 → 撤单拒绝（SSE `CANCEL_REJECT(59)` CxlRejReason / SZSE `CancelReject(290008)` RejectText），原订单保留。
+  回归测试：`SseCancelTest`（4 用例：上下文组装/未知订单拒绝/撤单成功/撤单失败）、`SzseCancelTest`（同构 4 用例）。
 
 - [x] **P1-9 未覆盖的委托结果码不下发任何回执** ✅
   SSE/SZSE Confirm 转换器的 default 分支改为按申报拒绝（ExecType=8）兜底下发。
@@ -59,13 +60,15 @@
   序号改为按会话（channel attr）独立自增；SZSE 协议帧无序号字段，无需处理。
   回归测试：`SseBinServerTest.msgSeqNumShouldBePerSession`（双会话序号独立）。
 
-- [ ] **P1-11 成交回报字段语义需对照协议规范核对** ⬜（需协议规范，未启动）
-  未修复项：taker 回报 lastPx 取委托价而非成交价（taker 一次成交可能对应多笔 trades，需按规范决定取价规则或逐笔下发）；SZSE leavesQty 未扣减已成交；ordStatus 恒 "0" 未区分部分/全部成交；`tradeDate = transactTime/1e6` 的正确性；CumQty/AvgPx/手续费未填。
-  已顺带完成：ExecType 字符串字面量统一为 `common.ExecType` 常量（含新增 TRADE="F"）。
+- [x] **P1-11 成交回报字段语义** 🔧（2026-10 功能开发轮修正主要项，正式规范核对仍开放）
+  已修正：回报改为**逐笔生成**（taker/maker 每笔成交各一份），`LastPx`/`LastQty` 取实际成交价量（原 taker 取委托价）；`CommandWrapper.cumQty` 累计成交量，`LeavesQty = 委托量 - CumQty`（SZSE 另填 `CumQty`；SSE Report 无该字段）；撤单确认的 CumQty/LeavesQty 同样正确。
+  已验证非问题：`tradeDate = transactTime/1e6` 对 `yyyymmddHHmmss` 格式时间戳即 `yyyymmdd`，与 gt-auto 基准一致。
+  保持现状：成交回报 `OrdStatus` 恒 "0"（与 gt-auto 基准数据一致，正式语义待规范确认）；手续费/成交编号等字段协议未用。
+  回归测试：`SzseBinServerTest`（leavesQty/cumQty 断言）；gt-auto SSE 端到端回归全绿（LastPx/LeavesQty 逐字段匹配）。
 
-- [ ] **P1-12 HTTP 模块与协议模块撮合核心割裂** ⬜（设计决策，未启动）
-  `ExchangeConfig` 仍为 HTTP 独立核心（硬编码演示数据）。已加 TODO 注释标明定位，待决策：打通市场/支持指定市场/移除。
-  已顺带完成：事件回调的 `System.out.println` 全部改为日志。
+- [x] **P1-12 HTTP 模块与协议模块撮合核心割裂** ✅（2026-10 功能开发轮：打通市场）
+  删除独立 demo 撮合核心（`ExchangeConfig`，硬编码 uid 1001/symbol 10086）；HTTP 经 `common.OrderGateway` 按 `market` 参数路由到 SSE/SZSE 真实撮合核心（缺省 sse），与协议通道共用市场数据；HTTP 委托缓存复用（channel/originMsg 为空，回报仅记日志）。
+  回归测试：`ExchangeServiceImplTest`（路由/异步/同步/超时 5 用例）；boot 冒烟验证 HTTP 单真实进入 SSE 市场并同步收到确认。
 
 - [x] **P1-13 Netty 端口绑定失败不 fail-fast** ✅
   `bind().sync()`，失败抛 `IllegalStateException` 终止启动。实机验证：占用端口时应用启动失败退出。
@@ -87,11 +90,10 @@
   转换器 `@Component` 移除（注明手动注册）；`@Log4j2`/`@Slf4j` 统一为 `@Slf4j`；`System.out.println` 全部清理；未使用 import 清理；`checkImmediateFill` 死代码删除。
 
 - [x] **P2-18 SZSE 消息类型魔法数字常量化** ✅
-  新增 `szse/SzseMsgType`（HEARTBEAT=3、EXECUTION_CONFIRM=200102、EXECUTION_REPORT=200115），全部替换。
+  新增 `szse/SzseMsgType`（LOGON=1、HEARTBEAT=3、ORDER_CANCEL_REQUEST=190007、CANCEL_REJECT=290008、EXECUTION_CONFIRM=200102、EXECUTION_REPORT=200115 等），全部替换。
 
-- [x] **P2-19 HTTP 接口语义修正** 🔧
-  已完成：javadoc 与实现对齐（异步受理）；orderId 非数字由 `@Pattern` 拦截（400）；`@Positive` 语义修正。
-  未做：同步等待订单状态（原 javadoc 描述的"等 3 秒返回状态"实现）；`OrderResponse`/`OrderResult` DTO 接入。
+- [x] **P2-19 HTTP 接口语义修正** ✅（2026-10 功能开发轮完成同步等待与 DTO 接入）
+  已完成：javadoc 与实现对齐；orderId 非数字由 `@Pattern` 拦截（400）；`@Positive` 语义修正；`waitTimeoutMs>0` 时同步等待撮合确认（先注册等待再提交避免竞态），返回 `OrderResponse`（success/pending/execType/ordStatus）；`OrderResult` 未接入已删除。
 
 - [x] **P2-20 测试与交付工程化** 🔧
   已完成：新增 10 个测试类 38 个用例（转换器映射、确认回执、会话层管线、按会话序号、缓存清理、CSV fail-fast、参数校验）；pom 补 surefire 2.22.2（此前 JUnit 5 用例根本不会执行）；Dockerfile（JDK 8 基础镜像，含 data 目录）；`local-test.sh` 本地基础测试脚本（unit/boot/e2e 三阶段，条件不足自动跳过）；GitHub Actions CI（`.github/workflows/ci.yml`：JDK 8+17 构建矩阵、JDK 8 产物冒烟、gt-auto 协议回归，后两者复用本地脚本）。
@@ -113,11 +115,15 @@
 
 ## 建议的后续处理顺序
 
-1. **P1-8 撤单链路**（协议完整性最大缺口，需求最明确）；
-2. **P1-11 回报字段核对**（需取得 SSE/SZSE 协议规范，逐字段确认 taker 成交价、leavesQty、ordStatus、tradeDate）；
-3. **P1-12 HTTP 模块定位决策**；
-4. **P2-20 补 SZSE 回归用例 + CI**；
-5. P3 按需。
+1. **SZSE gt-auto 回归用例**（撤单/成交回报已实现但仅 SSE 有端到端回归）；
+2. **回报字段正式规范核对**（OrdStatus 成交态语义、手续费/成交编号等未填字段）；
+3. **双市场模板化抽象**（P2-16 未做项，两套 Server 约 80% 重复）；
+4. P3 按需（行情/持久化/交易时段/北交所/可观测性）。
+
+## 变更历史
+
+- 2026-09-19：文档建立 + 第一轮修复（全部 P0、7 项 P1 缺陷、P2 工程问题，38 个测试）。
+- 2026-10-07：功能开发轮——撤单全链路（P1-8）、成交回报逐笔化与字段修正（P1-11）、HTTP 打通市场（P1-12）、HTTP 同步等待确认（P2-19），测试增至 53 个。
 
 ## 本地验证方式（修复后）
 
@@ -126,7 +132,7 @@
 ./local-test.sh
 
 # 或分阶段
-./local-test.sh unit        # 编译 + 38 个单元测试 + 打包（任意 JDK）
+./local-test.sh unit        # 编译 + 53 个单元测试 + 打包（任意 JDK）
 ./local-test.sh boot        # JDK 8 启动冒烟（需 JAVA8_HOME 或 --jdk8）
 ./local-test.sh e2e         # gt-auto SSE 协议回归（另需 gt-auto）
 

@@ -80,24 +80,26 @@ flowchart TB
             SZSEPIPE["Netty Pipeline（同构）"]
             SZSECORE["SzseBinServer"]
         end
-        subgraph httpmod["HTTP 模块 (:8080 /api/v1)"]
-            CTRL["OrderController"]
-            SVC["ExchangeServiceImpl"]
-        end
-        CONV["报文转换层<br/>ApiCommandConvertorContext + 各 Convertor"]
-        LOAD["数据加载层<br/>SymbolInfoLoadService / AccountInfoLoadService"]
-        DEMO["ExchangeConfig<br/>（HTTP 专用 demo 撮合核心）"]
+    subgraph httpmod["HTTP 模块 (:8080 /api/v1)"]
+        CTRL["OrderController"]
+        SVC["ExchangeServiceImpl<br/>market 路由 + 同步等待"]
+        GW["OrderGateway 接口"]
+    end
+    CONV["报文转换层<br/>ApiCommandConvertorContext + 各 Convertor"]
+    LOAD["数据加载层<br/>SymbolInfoLoadService / AccountInfoLoadService"]
     end
 
-    subgraph eng["撮合引擎 exchange-core2 × 3 实例"]
+    subgraph eng["撮合引擎 exchange-core2 × 2 实例"]
         EC1["SSE 撮合核心<br/>(Disruptor)"]
         EC2["SZSE 撮合核心<br/>(Disruptor)"]
-        EC3["HTTP demo 核心<br/>(Disruptor)"]
     end
 
     OMSSSE -->|SSE 二进制协议| SSEPIPE --> SSECORE
     OMSSZSE -->|SZSE 二进制协议| SZSEPIPE --> SZSECORE
-    HTTPCLI -->|JSON| CTRL --> SVC --> EC3
+    HTTPCLI -->|JSON| CTRL --> SVC
+    SVC -.->|market=sse| GW
+    GW -->|submitExternalOrder| SSECORE
+    GW -->|submitExternalOrder| SZSECORE
 
     SSECORE <--> CONV
     SZSECORE <--> CONV
@@ -110,13 +112,14 @@ flowchart TB
 
 ### 2.2 关键设计决策
 
-1. **每个协议市场一个独立的撮合核心**：`SseBinServerConfig` 与 `SzseBinServerConfig` 各自构建一个 `ExchangeCore`（Disruptor 实例）并互不共享，天然实现市场隔离（证券代码、账户体系独立）。
-   - 注意：目前**存在第三个撮合核心**——`ExchangeConfig#exchangeApi()`，它为 HTTP 接口服务，内置了硬编码的演示数据（uid 1001/1002、symbol 10086），与两个协议市场**不互通**（已知问题，见 TODO P1-12）。
-2. **报文转换采用注册表模式**：`ApiCommandConvertorContext` 是全局单例，按「报文 body 的 Class」注册/查找转换器，SSE 与 SZSE 各注册一个新订单转换器（`SseApiCommandConverter` / `SzseApiCommandConverter`），新增报文类型只需扩展转换器。
+1. **每个协议市场一个独立的撮合核心**：`SseBinServerConfig` 与 `SzseBinServerConfig` 各自构建一个 `ExchangeCore`（Disruptor 实例）并互不共享，天然实现市场隔离（证券代码、账户体系独立）。HTTP 接口通过 `OrderGateway` 路由到目标市场的撮合核心（`market=sse/szse`，缺省 sse），与协议通道共用同一市场数据与撮合引擎。
+2. **报文转换采用注册表模式**：`ApiCommandConvertorContext` 是全局单例，按「报文 body 的 Class」注册/查找转换器，SSE 与 SZSE 各注册一个新订单转换器（`SseApiCommandConverter` / `SzseApiCommandConverter`），新增报文类型只需扩展转换器。撤单报文因需反查原订单缓存，由各市场 Server 直接处理。
 3. **上行异步、下行回调**：上行 `submitCommandAsync` 非阻塞提交；下行依赖 exchange-core 的 `IEventsHandler` 回调（`commandResult` / `tradeEvent` / `rejectEvent` / `reduceEvent` / `orderBook`），在回调里完成「事件 → 协议报文」转换并回写 Netty channel。
-4. **原报文缓存（cache）**：`SseBinServer` / `SzseBinServer` 各持有一个 `ConcurrentHashMap<Long, CommandWrapper>`，以内部 orderId 为 key 缓存「原始委托报文 + 客户端 channel」。因为 exchange-core 的回调事件里只有 orderId 等撮合侧字段，回填协议报文的账号/营业部等字段必须回查原始委托。缓存清理路径：申报被拒（确认 ExecType=8 后移除）、taker 全部成交（takeOrderCompleted）、连接断开（按会话批量清理）。
+4. **原报文缓存（cache）**：`SseBinServer` / `SzseBinServer` 各持有一个 `ConcurrentHashMap<Long, CommandWrapper>`，以内部 orderId 为 key 缓存「原始委托报文 + 客户端 channel」。因为 exchange-core 的回调事件里只有 orderId 等撮合侧字段，回填协议报文的账号/营业部等字段必须回查原始委托。缓存清理路径：申报被拒（确认 ExecType=8 后移除）、taker 全部成交（takeOrderCompleted）、撤单成功、连接断开（按会话批量清理）。另维护 `clOrdIdIndex`（ClOrdId → orderId）供撤单按 `origClOrdId` 反查，与缓存同步清理。
 5. **内部订单号全局自增**：`GlobalUniqueId`（AtomicLong 从 1 开始）同时用于 orderId 与资金调整的 transactionId；SSE 委托的 `securityId`（如 600000）直接映射为 exchange-core 的 `symbolId`，`account` 映射为 `uid`。
 6. **下行消息序号按会话独立**：SSE 下行 MsgSeqNum 存于 channel attr（`Constant.MSG_SEQ_NUM`），每个会话内单调递增、互不影响。
+7. **成交回报逐笔生成**：`tradeEvent` 遍历成交明细（trades），每笔成交分别向 taker 与 maker 发一份回报，`LastPx`/`LastQty` 取实际成交价量；`CommandWrapper.cumQty` 累计已成交量，`LeavesQty = 委托量 - CumQty`（SZSE 另填 CumQty 字段；SSE Report 无该字段）。
+8. **撤单链路**：撤单请求（SSE `ORDER_CANCEL(61)` / SZSE `OrderCancelRequest(190007)`）按 `origClOrdId` 反查原订单 → 组装 `ApiCancelOrder`（orderId/uid/symbol 取自原委托）提交；撮合返回 SUCCESS 下发撤单确认（Report/ExecutionReport，ExecType=4、LeavesQty=0、OrdStatus=4），失败下发撤单拒绝（SSE `CANCEL_REJECT(59)` 带 CxlRejReason / SZSE `CancelReject(290008)` 带 RejectText），失败后原订单保留。
 
 ### 2.3 线程模型
 
@@ -225,10 +228,11 @@ SSE（`SseBinary.BodyMessageFactory.MessageType`）：
 | 40 | LOGON | 双向 | ✅ 回显 |
 | 41 | LOGOUT | 双向 | ✅ 回显 |
 | 58 | NEW_ORDER_SINGLE | C→S | ✅ 转换下单 |
-| 61 | ORDER_CANCEL | C→S | ❌ 未实现 |
+| 61 | ORDER_CANCEL | C→S | ✅ 撤单（按 origClOrdId 反查） |
 | 32 | CONFIRM | S→C | ✅ 委托确认 |
-| 103 | REPORT | S→C | ✅ 成交回报 |
-| 59/204 | CANCEL_REJECT / ORDER_REJECT | S→C | ❌ 未实现 |
+| 103 | REPORT | S→C | ✅ 成交回报（逐笔）/ 撤单确认（ExecType=4） |
+| 59 | CANCEL_REJECT | S→C | ✅ 撤单拒绝 |
+| 204 | ORDER_REJECT | S→C | ❌ 未实现（拒绝以 Confirm ExecType=8 下发） |
 
 SZSE（库中无枚举，代码中为硬编码魔数）：
 
@@ -237,10 +241,11 @@ SZSE（库中无枚举，代码中为硬编码魔数）：
 | 3 | Heartbeat | 双向 | ✅ 回显 |
 | — | Logon / Logout | 双向 | ✅ 回显 |
 | — | NewOrder | C→S | ✅ 转换下单 |
-| — | OrderCancelRequest | C→S | ❌ 未实现 |
+| 190007 | OrderCancelRequest | C→S | ✅ 撤单（按 origClOrdId 反查） |
 | 200102 | ExecutionConfirm（Extend200102） | S→C | ✅ 委托确认 |
-| 200115 | ExecutionReport（Extend200115） | S→C | ✅ 成交回报 |
-| — | BusinessReject / CancelReject | S→C | ❌ 未实现 |
+| 200115 | ExecutionReport（Extend200115） | S→C | ✅ 成交回报（逐笔）/ 撤单确认（ExecType=4） |
+| 290008 | CancelReject | S→C | ✅ 撤单拒绝 |
+| 4 | BusinessReject | S→C | ❌ 未实现（拒绝以 ExecutionConfirm ExecType=8 下发） |
 
 ### 3.3 报文转换层
 
@@ -318,10 +323,11 @@ classDiagram
 
 | 事件 | SSE 处理 | SZSE 处理 |
 | --- | --- | --- |
-| commandResult | ApiPlaceOrder → Confirm(32) 下发 | → ExecutionConfirm(200102) 下发 |
-| tradeEvent | taker + 每个 maker 各一份 Report(103) | taker + 每个 maker 各一份 ExecutionReport(200115) |
-| rejectEvent | 仅日志（未实现回执） | 仅日志 |
-| reduceEvent | 仅日志（未实现） | 仅日志 |
+| commandResult（ApiPlaceOrder） | Confirm(32) 下发；被拒则清理缓存并完成 HTTP 等待 | ExecutionConfirm(200102) 同左 |
+| commandResult（ApiCancelOrder） | SUCCESS → Report(103, ExecType=4) + 清理；失败 → CancelReject(59)，订单保留 | 同左（ExecutionReport / CancelReject(290008)） |
+| tradeEvent | 逐笔回报（taker + maker 各一份/每笔），LastPx=成交价，LeavesQty 扣减 | 同左（ExecutionReport，另填 CumQty） |
+| rejectEvent | 仅日志 | 仅日志 |
+| reduceEvent | 仅日志 | 仅日志 |
 | orderBook | 仅日志（未实现行情发布） | 仅日志 |
 
 ### 3.5 数据加载层
@@ -351,22 +357,32 @@ uid,currency,amount
 
 | 接口 | 说明 |
 | --- | --- |
-| `POST /api/v1/orders/place` | 提交委托（JSON），异步提交到 demo 撮合核心，恒返回 `true`（异常时 `false`） |
+| `POST /api/v1/orders/place` | 提交委托到指定市场（market=sse/szse，缺省 sse），与协议通道共用撮合核心；须使用目标市场 `data/*.csv` 中存在的账户与证券 |
 | `GET /api/v1/orders/health` | 健康检查 |
 
-请求体 `OrderRequest`：orderId(String，须为数字)、userId、action(BID/ASK)、orderType、price、size、symbol、reservePrice（可选，缺省回落到 price）。
+请求体 `OrderRequest`：orderId(String，须为数字)、market(sse/szse，可选)、userId、action(BID/ASK)、orderType、price、size、symbol、reservePrice（可选，缺省回落到 price）、waitTimeoutMs（可选）。
 
-> 已知问题（均已修复，保留记录）：
-> - 参数校验此前因 jakarta/javax 混用而完全失效，现已切换为 `spring-boot-starter-validation`（javax 系）并真实生效（非法请求返回 400）；
-> - 接口语义为**异步受理**（提交成功即返回 true），订单确认/成交由撮合事件回调输出到日志；同步等待订单状态与 `OrderResponse`/`OrderResult` 接入见 TODO P2-19；
-> - HTTP 模块使用独立的 demo 撮合核心，与协议市场不互通（TODO P1-12）。
+响应 `OrderResponse`（JSON）：
+
+- **异步模式**（不传 waitTimeoutMs）：提交后立即返回 `{success, pending:true, market, orderId}`；
+- **同步模式**（waitTimeoutMs>0，先注册等待再提交以避免竞态）：等待撮合核心确认，返回 `{success, pending:false, execType, ordStatus}`（0=受理成功，8=拒绝）；超时则返回 `pending:true` 与超时提示；
+- HTTP 委托无协议连接与原始报文，其回报（确认/成交/撤单）仅记录日志不下发。
+
+```shell
+# 示例：SZSE 市场同步下单
+curl -X POST localhost:8080/api/v1/orders/place -H 'Content-Type: application/json' -d '{
+  "orderId":"20002","market":"szse","userId":20001,"action":"ASK",
+  "orderType":"GTC","price":12.5,"size":10,"symbol":1,"waitTimeoutMs":3000}'
+```
+
+> 历史问题（均已处理）：参数校验失效已切换 javax 系修复；原独立 demo 撮合核心（硬编码 uid 1001/symbol 10086）已移除，HTTP 经 `OrderGateway` 路由接入真实市场。
 
 ### 3.7 公共组件
 
 - **GlobalUniqueId**：静态 AtomicLong，从 1 自增；服务重启后从 1 重新开始（无持久化）。
 - **NettyLoggingUtil**：优先读环境变量 `NETTY_LOGGING_ENABLED` / `NETTY_LOGGING_LEVEL` / `NETTY_LOGGING_HANDLER_NAME`，其次系统属性 `netty.logging.*`，默认关闭。
 - **HeartBtIntUtil**：心跳间隔夹取到 [5, 60] 秒。
-- **CommandWrapper**：`uniqueId(orderId) + channel + originMsg(原始协议报文) + apiCommand`。
+- **CommandWrapper**：`uniqueId(orderId) + channel + originMsg(原始协议报文) + apiCommand + clOrdId + cumQty`（channel/originMsg 对 HTTP 委托为空）。
 
 ---
 
@@ -416,7 +432,29 @@ sequenceDiagram
     S-->>C: 成交回报（taker 一份 + 每个 maker 各一份）
 ```
 
-### 4.3 启动流程
+### 4.3 委托撤单（SSE，SZSE 同构）
+
+```mermaid
+sequenceDiagram
+    participant C as 客户端(OMS)
+    participant S as SseBinServer
+    participant E as exchange-core
+
+    Note over S: 原委托已缓存（clOrdIdIndex: CL-1 → orderId）
+    C->>S: OrderCancel(61) [clOrdId=CX-1, origClOrdId=CL-1]
+    alt origClOrdId 未知
+        S-->>C: CancelReject(59) [CxlRejReason=1]
+    else 找到原订单
+        S->>E: ApiCancelOrder(orderId, uid, symbol ← 原委托)
+        E-->>S: commandResult(SUCCESS)
+        S-->>C: Report(103) ExecType=4 OrdStatus=4 LeavesQty=0
+        S->>S: 清理缓存 + clOrdId 索引
+        E-->>S: commandResult(失败)
+        S-->>C: CancelReject(59)（原订单保留）
+    end
+```
+
+### 4.4 启动流程
 
 ```mermaid
 sequenceDiagram
@@ -487,15 +525,14 @@ docker run --rm -p 8080:8080 -p 9010:9010 -p 9011:9011 exchange-simulator
 
 ## 7. 已知问题与限制（摘要）
 
-详细清单及代码位置见 [TODO.md](./TODO.md)。2026-09-19 修复轮后仍开放的问题：
+详细清单及代码位置见 [TODO.md](./TODO.md)。两轮修复/开发后仍开放的问题：
 
 1. **运行时仅支持 JDK 8**（chronicle 依赖无升级路径，已通过 Dockerfile/文档固化；CI 待跟进）；
-2. **撤单全链路未实现**（ORDER_CANCEL / CancelReject / ReduceEvent）；
-3. 成交回报部分字段语义待对照协议规范核对（taker 成交价、leavesQty、ordStatus、tradeDate、CumQty 等）；
-4. HTTP 模块与协议市场使用独立撮合核心（demo 数据），定位待决策；
-5. maker 单部分成交期间缓存保留至断连（无终态信号，可接受残余）；
-6. 无持久化：重启后订单/成交/序列号全部丢失（模拟器可接受，但需在文档层面明确）；
-7. 无登录鉴权（Logon 不校验账号密码）——模拟器定位下可接受；
-8. SZSE 协议回归用例与 CI 流水线待补充。
+2. 成交回报部分字段仍需对照正式协议规范确认（ordStatus 在成交回报中恒为 "0" 与 gt-auto 基准一致但语义存疑；手续费/成交编号等字段未填）；
+3. maker 单部分成交期间缓存保留至断连（无终态信号，可接受残余）；
+4. 无持久化：重启后订单/成交/序列号全部丢失（模拟器可接受，但需在文档层面明确）；
+5. 无登录鉴权（Logon 不校验账号密码）——模拟器定位下可接受；
+6. SZSE 协议回归用例待补充（gt-auto testcase 仅有 SSE）；
+7. HTTP 委托的回报仅记日志（无连接可下发，属设计内行为）。
 
-已修复项（心跳死代码、NPE、校验失效、fail-fast、缓存泄漏、按会话序号等）见 [TODO.md](./TODO.md) 的修复记录。
+已修复/实现项（撤单链路、逐笔成交回报、HTTP 市场路由与同步确认、心跳死代码、NPE、校验失效、fail-fast、缓存泄漏、按会话序号等）见 [TODO.md](./TODO.md) 的记录。

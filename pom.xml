@@ -55,6 +55,14 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- ExchangeApi 为 final 类，需要 inline mock-maker -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-inline</artifactId>
+            <version>4.5.1</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- 参数校验（Boot 2.7 对应 javax.validation 系；勿混用 jakarta.validation） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
