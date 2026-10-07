@@ -11,9 +11,46 @@ env:
   JAR: target/exchange-simulator-1.0-SNAPSHOT.jar
 
 jobs:
+  # codec/sse-bin/szse-bin 只存在于 fin-proto-java 的 Gradle 构建产物中，未发布到 Maven Central，
+  # CI 必须现场构建后喂给后续 Maven 步骤（本地开发者由 ~/.m2 里的 publishToMavenLocal 产物提供）。
+  finproto-deps:
+    name: 构建协议依赖 (fin-proto-java)
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出 fin-proto-java
+        uses: actions/checkout@v4
+        with:
+          repository: xinchentechnote/fin-proto-java
+          # 协议变更需要跟版时，把 main 换成对应 tag/commit
+          ref: main
+
+      - name: 设置 JDK 11
+        uses: actions/setup-java@v4
+        with:
+          # fin-proto-java 的 Gradle 工具链固定 languageVersion=11（产物字节码仍是 Java 8）
+          distribution: temurin
+          java-version: '11'
+          cache: gradle
+
+      - name: 发布 codec/sse-bin/szse-bin
+        run: |
+          ./gradlew --no-daemon -Dmaven.repo.local="$RUNNER_TEMP/m2" \
+            :codec:publishToMavenLocal \
+            :sse-bin:publishToMavenLocal \
+            :szse-bin:publishToMavenLocal
+
+      - name: 上传协议依赖
+        uses: actions/upload-artifact@v4
+        with:
+          name: finproto-m2
+          path: ${{ runner.temp }}/m2
+          if-no-files-found: error
+          retention-days: 7
+
   build-test:
     name: 构建+单元测试 (JDK ${{ matrix.java }})
     runs-on: ubuntu-latest
+    needs: finproto-deps
     strategy:
       fail-fast: false
       matrix:
@@ -30,6 +67,17 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
           cache: maven
+
+      - name: 下载协议依赖
+        uses: actions/download-artifact@v4
+        with:
+          name: finproto-m2
+          path: ${{ runner.temp }}/finproto-m2
+
+      - name: 安装协议依赖到本地 Maven 仓库
+        run: |
+          mkdir -p "$HOME/.m2/repository"
+          cp -R "$RUNNER_TEMP/finproto-m2/." "$HOME/.m2/repository/"
 
       - name: 编译 + 单元测试 + 打包
         run: mvn -B -ntp clean verify

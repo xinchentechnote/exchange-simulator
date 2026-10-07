@@ -41,6 +41,10 @@ docker run --rm -p 8080:8080 -p 9010:9010 -p 9011:9011 exchange-simulator
   本机安装 JDK 8 推荐放入 `~/Library/Java/JavaVirtualMachines/`（Zulu 等 tar.gz 解压即可被 `java_home` 识别）。
 - 无 JDK 8 / gt-auto 时对应阶段自动跳过（SKIP），不影响其他阶段；SKIP 不计入失败。
 - e2e 阶段有 10 分钟看门狗（`E2E_TIMEOUT` 可调），gt-auto 异常时不会无限等待。
+- `pom.xml` 依赖 `com.xinchentechnote.finproto:{sse-bin,szse-bin}`（传递依赖 `codec`），这三个构件只在
+  [fin-proto-java](https://github.com/xinchentechnote/fin-proto-java) 中生成、未发布到 Maven Central。
+  新机器上 `mvn` 会报 `Could not resolve dependencies`，需先发布到本地仓库：
+  `./gradlew :codec:publishToMavenLocal :sse-bin:publishToMavenLocal :szse-bin:publishToMavenLocal`（Gradle 工具链为 JDK 11）。
 
 ## CI
 
@@ -48,7 +52,8 @@ docker run --rm -p 8080:8080 -p 9010:9010 -p 9011:9011 exchange-simulator
 
 | Job | 内容 |
 | --- | --- |
-| build-test | JDK 8 + 17 矩阵执行 `mvn clean verify`，JDK 8 产物上传 artifact |
+| finproto-deps | 检出 fin-proto-java，Gradle 发布 codec/sse-bin/szse-bin 成 Maven 仓库 artifact（私有协议依赖，Central 上没有） |
+| build-test | 装入 finproto-deps 产物后，JDK 8 + 17 矩阵执行 `mvn clean verify`，JDK 8 产物上传 artifact |
 | smoke-test | JDK 8 启动打包产物，做 HTTP 冒烟（复用 `local-test.sh boot`） |
 | protocol-e2e | JDK 8 + gt-auto 跑 SSE 协议回归（复用 `local-test.sh e2e`） |
 
