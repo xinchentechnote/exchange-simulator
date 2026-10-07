@@ -145,7 +145,8 @@ start_app() { # start_app <java8bin>
             fail "端口 $port 已被占用（可能有实例在运行），请先停止"; return 1
         fi
     done
-    APP_LOG="$(mktemp -t exchange-simulator-smoke)"
+    # 模板结尾必须自带 XXXXXX：GNU mktemp 不认 BSD 的 `-t` 写法（Linux runner 上会直接失败）
+    APP_LOG="$(mktemp "${TMPDIR:-/tmp}/exchange-simulator-smoke.XXXXXX")"
     "$1" -jar "$jar" >"$APP_LOG" 2>&1 &
     APP_PID=$!
     local i
